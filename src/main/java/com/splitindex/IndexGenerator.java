@@ -155,6 +155,11 @@ public class IndexGenerator {
 
     /** Returns directory size in megabytes. */
     static double dirSizeMB(File dir) {
+        return dirSizeBytes(dir) / (1024.0 * 1024.0);
+    }
+
+    /** Returns directory size in bytes (recursive). */
+    private static long dirSizeBytes(File dir) {
         long size = 0;
         File[] files = dir.listFiles();
         if (files != null) {
@@ -162,11 +167,11 @@ public class IndexGenerator {
                 if (f.isFile()) {
                     size += f.length();
                 } else if (f.isDirectory()) {
-                    size += dirSizeMB(f) * 1024 * 1024;
+                    size += dirSizeBytes(f);
                 }
             }
         }
-        return size / (1024.0 * 1024.0);
+        return size;
     }
 
     public static void main(String[] args) throws IOException {

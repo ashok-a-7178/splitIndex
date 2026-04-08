@@ -151,9 +151,10 @@ public class IndexSplitterCopy {
 
         // Build a set of IDs to DELETE (all IDs except the ones we keep)
         List<String> allIds = collectUniqueIds();
+        java.util.Set<String> keepSet = new java.util.HashSet<>(keepIds);
         List<String> deleteIds = new ArrayList<>();
         for (String id : allIds) {
-            if (!keepIds.contains(id)) {
+            if (!keepSet.contains(id)) {
                 deleteIds.add(id);
             }
         }
