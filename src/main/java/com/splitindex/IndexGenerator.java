@@ -14,22 +14,72 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Version;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 /**
  * Generates a test Lucene 4 index with {@link SplitConfig#NUM_FIELDS} fields
- * and {@link SplitConfig#TOTAL_DOCS} documents. Each document has an "ID" field
- * whose value is one of {@link SplitConfig#NUM_UNIQUE_IDS} unique string IDs,
- * assigned in round-robin fashion.
+ * and {@link SplitConfig#TOTAL_DOCS} documents.  Each document is approximately
+ * {@link SplitConfig#TARGET_DOC_SIZE_BYTES} bytes in stored content.
+ *
+ * <p>Term values are drawn from an open-source English dictionary
+ * ({@code dictionary.txt} bundled as a classpath resource) rather than
+ * randomly generated character sequences, producing a more realistic index.</p>
+ *
+ * <p>Each document has an "ID" field whose value is one of
+ * {@link SplitConfig#NUM_UNIQUE_IDS} unique string IDs, assigned in
+ * round-robin fashion.</p>
  */
 public class IndexGenerator {
 
     private static final Random RANDOM = new Random(42);
-    private static final String ALPHABET = "abcdefghijklmnopqrstuvwxyz";
+
+    /** Dictionary words loaded from the classpath resource. */
+    private final String[] dictionary;
+
+    public IndexGenerator() throws IOException {
+        this.dictionary = loadDictionary();
+    }
+
+    /**
+     * Loads the dictionary word list from the classpath resource
+     * {@code dictionary.txt}.  The file is expected to contain one
+     * lower-case word per line and is derived from the NLTK words
+     * corpus (an open-source English word list).
+     */
+    private static String[] loadDictionary() throws IOException {
+        List<String> words = new ArrayList<>();
+        try (InputStream is = IndexGenerator.class.getClassLoader()
+                .getResourceAsStream("dictionary.txt")) {
+            if (is == null) {
+                throw new IOException("dictionary.txt not found on classpath. "
+                        + "Place the file in src/main/resources/.");
+            }
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (!line.isEmpty()) {
+                        words.add(line);
+                    }
+                }
+            }
+        }
+        if (words.isEmpty()) {
+            throw new IOException("dictionary.txt is empty");
+        }
+        System.out.println("[IndexGenerator] Loaded " + words.size()
+                + " dictionary words from classpath resource");
+        return words.toArray(new String[0]);
+    }
 
     /**
      * Generates the source index at {@link SplitConfig#SOURCE_INDEX_DIR}.
@@ -48,6 +98,8 @@ public class IndexGenerator {
         System.out.println("[IndexGenerator] Generating index with " + SplitConfig.TOTAL_DOCS
                 + " docs, " + SplitConfig.NUM_FIELDS + " fields, "
                 + SplitConfig.NUM_UNIQUE_IDS + " unique IDs");
+        System.out.println("[IndexGenerator] Target doc size: ~"
+                + SplitConfig.TARGET_DOC_SIZE_BYTES + " bytes");
         System.out.println("[IndexGenerator] Target directory: " + sourceDir.getAbsolutePath());
 
         long start = System.currentTimeMillis();
@@ -91,47 +143,95 @@ public class IndexGenerator {
     }
 
     /**
-     * Creates a single Lucene document with NUM_FIELDS fields.
-     * Field "ID" is assigned round-robin from 0..NUM_UNIQUE_IDS-1.
+     * Creates a single Lucene document with {@link SplitConfig#NUM_FIELDS}
+     * fields whose combined stored content is approximately
+     * {@link SplitConfig#TARGET_DOC_SIZE_BYTES} bytes.
+     *
+     * <p>The field mix is:
+     * <ul>
+     *   <li>Field 0 – "ID" (StringField, round-robin unique IDs)</li>
+     *   <li>Field 1 – "docSequence" (IntField, document ordinal)</li>
+     *   <li>Fields 2..N – cycling through StringField (keyword from
+     *       dictionary), TextField (multi-word dictionary phrase),
+     *       IntField, LongField, and FloatField</li>
+     * </ul></p>
+     *
+     * <p>Text/String field lengths are calibrated so that the total stored
+     * value bytes across all fields approximate the target document size.</p>
      */
     private Document createDocument(int docIndex) {
         Document doc = new Document();
 
-        // Field 1: ID (StringField, indexed but not tokenized)
+        // ---------- fixed-overhead fields ----------
+        // Field 0: ID (StringField, indexed but not tokenized)
         String idValue = "ID_" + (docIndex % SplitConfig.NUM_UNIQUE_IDS);
         doc.add(new StringField("ID", idValue, Field.Store.YES));
 
-        // Field 2: docSequence (stored integer for traceability)
+        // Field 1: docSequence (stored integer for traceability)
         doc.add(new IntField("docSequence", docIndex, Field.Store.YES));
 
-        // Remaining fields: mix of types to simulate real-world index
+        // ---------- budget calculation ----------
+        // Count the fixed-size bytes contributed by the non-text remaining
+        // fields and distribute the rest evenly across text-bearing fields.
+        int remaining = SplitConfig.NUM_FIELDS - 2; // fields 2..NUM_FIELDS-1
+
+        // Of every 5 fields: 1 StringField, 1 TextField, 1 Int, 1 Long, 1 Float
+        int numStringFields = 0;
+        int numTextFields = 0;
+        int fixedBytes = idValue.length() + 4; // ID value + docSequence int
+        for (int f = 2; f < SplitConfig.NUM_FIELDS; f++) {
+            switch (f % 5) {
+                case 0: numStringFields++; break;
+                case 1: numTextFields++;   break;
+                case 2: fixedBytes += 4;   break; // IntField  (4 bytes)
+                case 3: fixedBytes += 8;   break; // LongField (8 bytes)
+                case 4: fixedBytes += 4;   break; // FloatField(4 bytes)
+            }
+        }
+
+        int textBudget = SplitConfig.TARGET_DOC_SIZE_BYTES - fixedBytes;
+        if (textBudget < 0) textBudget = 0;
+
+        int totalTextFields = numStringFields + numTextFields;
+        int bytesPerTextField = (totalTextFields > 0)
+                ? textBudget / totalTextFields : 0;
+
+        // StringFields get ~40 % of per-field budget (short keywords);
+        // TextFields  get the remaining ~60 % (multi-word phrases).
+        int stringFieldBytes = Math.max(4, (int) (bytesPerTextField * 0.4));
+        int textFieldBytes   = Math.max(8, bytesPerTextField - stringFieldBytes);
+
+        // ---------- populate remaining fields ----------
         int fieldIndex = 2;
         while (fieldIndex < SplitConfig.NUM_FIELDS) {
             int type = fieldIndex % 5;
             String fieldName = "field_" + fieldIndex;
             switch (type) {
                 case 0:
-                    // StringField (keyword-like, not tokenized)
-                    doc.add(new StringField(fieldName, "val_" + RANDOM.nextInt(1000), Field.Store.YES));
+                    // StringField – single dictionary keyword
+                    doc.add(new StringField(fieldName,
+                            dictionaryWord(stringFieldBytes), Field.Store.YES));
                     break;
                 case 1:
-                    // TextField (tokenized text content)
-                    doc.add(new TextField(fieldName, randomText(10 + RANDOM.nextInt(20)), Field.Store.YES));
+                    // TextField – multi-word dictionary phrase
+                    doc.add(new TextField(fieldName,
+                            dictionaryPhrase(textFieldBytes), Field.Store.YES));
                     break;
                 case 2:
-                    // IntField
-                    doc.add(new IntField(fieldName, RANDOM.nextInt(100_000), Field.Store.YES));
+                    doc.add(new IntField(fieldName,
+                            RANDOM.nextInt(100_000), Field.Store.YES));
                     break;
                 case 3:
-                    // LongField
-                    doc.add(new LongField(fieldName, RANDOM.nextLong(), Field.Store.YES));
+                    doc.add(new LongField(fieldName,
+                            RANDOM.nextLong(), Field.Store.YES));
                     break;
                 case 4:
-                    // FloatField
-                    doc.add(new FloatField(fieldName, RANDOM.nextFloat() * 1000, Field.Store.YES));
+                    doc.add(new FloatField(fieldName,
+                            RANDOM.nextFloat() * 1000, Field.Store.YES));
                     break;
                 default:
-                    doc.add(new StringField(fieldName, "default_" + fieldIndex, Field.Store.YES));
+                    doc.add(new StringField(fieldName,
+                            dictionaryWord(stringFieldBytes), Field.Store.YES));
                     break;
             }
             fieldIndex++;
@@ -140,14 +240,64 @@ public class IndexGenerator {
         return doc;
     }
 
-    /** Generates a random text string of approximately the given word count. */
-    private String randomText(int wordCount) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < wordCount; i++) {
-            if (i > 0) sb.append(' ');
-            int wordLen = 3 + RANDOM.nextInt(8);
-            for (int j = 0; j < wordLen; j++) {
-                sb.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
+    /**
+     * Returns a single dictionary word whose length is at most
+     * {@code targetBytes}.  Several random candidates are sampled and the
+     * one closest to (but not exceeding) the target length is returned,
+     * preserving whole-word integrity.
+     */
+    private String dictionaryWord(int targetBytes) {
+        String best = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            String candidate = dictionary[RANDOM.nextInt(dictionary.length)];
+            if (candidate.length() <= targetBytes) {
+                if (best == null || candidate.length() > best.length()) {
+                    best = candidate;
+                }
+            }
+        }
+        // Fallback: if all candidates were too long, just pick one that
+        // fits (dictionary contains words 3-12 chars, so targetBytes >= 3
+        // will almost always succeed above).
+        if (best == null) {
+            best = dictionary[RANDOM.nextInt(dictionary.length)];
+            while (best.length() > targetBytes) {
+                best = dictionary[RANDOM.nextInt(dictionary.length)];
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Builds a multi-word phrase from dictionary words whose total length
+     * (including spaces) approximates {@code targetBytes}.  The result is
+     * trimmed at the last complete word boundary to avoid partial words.
+     */
+    private String dictionaryPhrase(int targetBytes) {
+        StringBuilder sb = new StringBuilder(targetBytes);
+        while (sb.length() < targetBytes) {
+            String word = dictionary[RANDOM.nextInt(dictionary.length)];
+            int needed = sb.length() == 0 ? word.length() : 1 + word.length();
+            if (sb.length() + needed > targetBytes) {
+                // Adding this word would exceed the budget.  Try a shorter
+                // word a few times; if nothing fits, stop to keep whole words.
+                int remaining = targetBytes - sb.length()
+                        - (sb.length() == 0 ? 0 : 1);
+                if (remaining < 3) break; // no room for any word
+                boolean fitted = false;
+                for (int retry = 0; retry < 5; retry++) {
+                    word = dictionary[RANDOM.nextInt(dictionary.length)];
+                    if (word.length() <= remaining) {
+                        if (sb.length() > 0) sb.append(' ');
+                        sb.append(word);
+                        fitted = true;
+                        break;
+                    }
+                }
+                if (!fitted) break;
+            } else {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(word);
             }
         }
         return sb.toString();

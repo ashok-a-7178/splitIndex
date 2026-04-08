@@ -18,16 +18,16 @@ public final class SplitConfig {
     // ---- Index generation settings ----
 
     /** Number of fields per document (including the ID field). */
-    public static final int NUM_FIELDS = 50;
+    public static final int NUM_FIELDS = 100;
 
     /** Number of unique ID values distributed across documents. */
     public static final int NUM_UNIQUE_IDS = 10_000;
 
-    /** Total number of documents to generate. Set lower for quick testing. */
-    public static final int TOTAL_DOCS = 100_000;
+    /** Total number of documents to generate. */
+    public static final int TOTAL_DOCS = 40_000_000;
 
-    // For full-scale benchmarking, change TOTAL_DOCS to:
-    // public static final int TOTAL_DOCS = 40_000_000;
+    /** Target document size in bytes (approximately). */
+    public static final int TARGET_DOC_SIZE_BYTES = 1024;
 
     /** Number of sub-indices to split into. */
     public static final int NUM_SPLITS = 10;
