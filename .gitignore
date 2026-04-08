@@ -1,0 +1,20 @@
+# Maven
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Benchmark data
+splitindex_benchmark/
