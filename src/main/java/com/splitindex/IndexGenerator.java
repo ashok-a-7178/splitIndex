@@ -241,42 +241,64 @@ public class IndexGenerator {
     }
 
     /**
-     * Returns a single dictionary word whose length is as close as possible
-     * to {@code targetBytes}.  If no single word is long enough the word is
-     * returned as-is (slightly under budget), keeping the keyword nature of
-     * a StringField.
+     * Returns a single dictionary word whose length is at most
+     * {@code targetBytes}.  Several random candidates are sampled and the
+     * one closest to (but not exceeding) the target length is returned,
+     * preserving whole-word integrity.
      */
     private String dictionaryWord(int targetBytes) {
-        // Pick a random word and, if it is shorter than the target, try a
-        // few more candidates and keep the one closest in length.
-        String best = dictionary[RANDOM.nextInt(dictionary.length)];
-        for (int attempt = 0; attempt < 3; attempt++) {
+        String best = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
             String candidate = dictionary[RANDOM.nextInt(dictionary.length)];
-            if (Math.abs(candidate.length() - targetBytes)
-                    < Math.abs(best.length() - targetBytes)) {
-                best = candidate;
+            if (candidate.length() <= targetBytes) {
+                if (best == null || candidate.length() > best.length()) {
+                    best = candidate;
+                }
             }
         }
-        // Truncate if too long
-        if (best.length() > targetBytes) {
-            best = best.substring(0, targetBytes);
+        // Fallback: if all candidates were too long, just pick one that
+        // fits (dictionary contains words 3-12 chars, so targetBytes >= 3
+        // will almost always succeed above).
+        if (best == null) {
+            best = dictionary[RANDOM.nextInt(dictionary.length)];
+            while (best.length() > targetBytes) {
+                best = dictionary[RANDOM.nextInt(dictionary.length)];
+            }
         }
         return best;
     }
 
     /**
      * Builds a multi-word phrase from dictionary words whose total length
-     * (including spaces) approximates {@code targetBytes}.
+     * (including spaces) approximates {@code targetBytes}.  The result is
+     * trimmed at the last complete word boundary to avoid partial words.
      */
     private String dictionaryPhrase(int targetBytes) {
         StringBuilder sb = new StringBuilder(targetBytes);
         while (sb.length() < targetBytes) {
-            if (sb.length() > 0) sb.append(' ');
-            sb.append(dictionary[RANDOM.nextInt(dictionary.length)]);
-        }
-        // Trim to target if slightly over
-        if (sb.length() > targetBytes) {
-            sb.setLength(targetBytes);
+            String word = dictionary[RANDOM.nextInt(dictionary.length)];
+            int needed = sb.length() == 0 ? word.length() : 1 + word.length();
+            if (sb.length() + needed > targetBytes) {
+                // Adding this word would exceed the budget.  Try a shorter
+                // word a few times; if nothing fits, stop to keep whole words.
+                int remaining = targetBytes - sb.length()
+                        - (sb.length() == 0 ? 0 : 1);
+                if (remaining < 3) break; // no room for any word
+                boolean fitted = false;
+                for (int retry = 0; retry < 5; retry++) {
+                    word = dictionary[RANDOM.nextInt(dictionary.length)];
+                    if (word.length() <= remaining) {
+                        if (sb.length() > 0) sb.append(' ');
+                        sb.append(word);
+                        fitted = true;
+                        break;
+                    }
+                }
+                if (!fitted) break;
+            } else {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(word);
+            }
         }
         return sb.toString();
     }
