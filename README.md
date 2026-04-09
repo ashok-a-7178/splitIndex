@@ -5,8 +5,8 @@ A Java project that benchmarks two approaches for splitting a large Lucene 4 ind
 ## Problem
 
 Given a Lucene 4 index with:
-- **40 million** documents (40GB index size)
-- **50 fields** per document
+- **10 million** documents (~19 GB index size)
+- **100 fields** per document
 - An **ID** field with **10,000 unique values** (non-unique across documents)
 
 Split the index into **10 sub-indices** by partitioning the ID values using round-robin assignment (ID_0 → dir0, ID_1 → dir1, ..., ID_9 → dir9, ID_10 → dir0, etc.).
@@ -30,7 +30,7 @@ Split the index into **10 sub-indices** by partitioning the ID values using roun
 ```
 src/main/java/com/splitindex/
 ├── SplitConfig.java             # Configuration constants (doc count, field count, paths, etc.)
-├── IndexGenerator.java          # Generates the test Lucene 4 index with 50 fields
+├── IndexGenerator.java          # Generates the test Lucene 4 index with 100 fields
 ├── IndexSplitterCopy.java       # Approach 1: Sequential copy + BooleanQuery deletion
 ├── IndexSplitterHardLink.java   # Approach 2: Hard link + BooleanQuery deletion
 └── SplitBenchmark.java          # Main benchmark runner with comparison output
@@ -75,38 +75,30 @@ mvn exec:java -Dexec.args="clean"
 mvn exec:java -Dsplitindex.basedir=/data/benchmark
 ```
 
-### Full-Scale Benchmark (40M docs)
+## Benchmark Results
 
-Edit `SplitConfig.java` and change:
-```java
-public static final int TOTAL_DOCS = 40_000_000;
-```
+Detailed benchmark results for both small and large index configurations are available in [benchmark.md](benchmark.md).
 
-Then rebuild and run:
-```bash
-mvn clean package && mvn exec:java
-```
-
-## Sample Output (100K docs, 421 MB index)
+### Large Index Results (10M docs, ~19 GB, 100 fields, 10 splits)
 
 ```
   +-------------------------------------------------+
   |                 | Copy+Delete | HardLink+Delete  |
   +-------------------------------------------------+
-  | Total Time      |     48,758 ms |     40,412 ms    |
-  | Copy/Link Phase |      5,703 ms |          3 ms    |
-  | Delete Phase    |     43,055 ms |     40,409 ms    |
+  | Total Time      |  1,999,016 ms |  1,361,625 ms    |
+  | Copy/Link Phase |    621,546 ms |        346 ms    |
+  | Delete Phase    |  1,377,470 ms |  1,361,279 ms    |
   +-------------------------------------------------+
 
-  Overall Speedup (HardLink vs Copy): 1.21x faster
-  Copy/Link Phase Speedup:            1901.00x faster
+  Overall Speedup (HardLink vs Copy): 1.47x faster
+  Copy/Link Phase Speedup:            1796.38x faster
 ```
 
 ### Key Findings
-- **Hard link phase is ~1900x faster** than file copy (3 ms vs 5,703 ms for 421 MB)
-- **Delete phase timing is identical** between both approaches (same Lucene operations)
-- **With a 40GB index**, the copy phase would take minutes while hard linking remains near-instant
-- **Hard link approach saves disk space** during the split process (no duplicate data until Lucene rewrites segments)
+- **Hard link phase is ~1796x faster** than file copy (346 ms vs 621,546 ms for ~19 GB)
+- **Delete phase timing is nearly identical** between both approaches (same Lucene operations)
+- **Hard link approach saves significant disk space** during the split process (no duplicate data until Lucene rewrites segments)
+- At scale, the copy phase dominates the total time—hard linking eliminates this bottleneck entirely
 
 ## How It Works
 
