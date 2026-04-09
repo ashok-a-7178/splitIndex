@@ -129,23 +129,21 @@ public class IndexGenerator {
         return words.toArray(new String[0]);
     }
 
+    /** Returns the profile used by this generator. */
+    public BenchmarkProfile getProfile() {
+        return profile;
+    }
+
     /**
-     * Generates the source index at {@link SplitConfig#SOURCE_INDEX_DIR}
-     * using a producer-consumer pattern:
+     * Generates the source index using a producer-consumer pattern:
      * <ul>
-     *   <li>{@link SplitConfig#NUM_PRODUCER_THREADS} producer threads
-     *       create {@link Document} batches in parallel</li>
+     *   <li>Producer threads create {@link Document} batches in parallel</li>
      *   <li>The main thread acts as the consumer, writing batches to
      *       the {@link IndexWriter}</li>
      * </ul>
      *
      * @return elapsed time in milliseconds
      */
-    /** Returns the profile used by this generator. */
-    public BenchmarkProfile getProfile() {
-        return profile;
-    }
-
     public long generate() throws IOException {
         File sourceDir = new File(profile.getSourceIndexDir());
         if (sourceDir.exists() && sourceDir.list() != null && sourceDir.list().length > 0) {
@@ -173,7 +171,7 @@ public class IndexGenerator {
         try (FSDirectory dir = FSDirectory.open(sourceDir);
              IndexWriter writer = new IndexWriter(dir, config)) {
 
-            int queueCapacity = SplitConfig.NUM_PRODUCER_THREADS * 2;
+            int queueCapacity = numProducers * 2;
             BlockingQueue<List<Document>> queue =
                     new ArrayBlockingQueue<>(queueCapacity);
             CountDownLatch producersDone = new CountDownLatch(numProducers);
