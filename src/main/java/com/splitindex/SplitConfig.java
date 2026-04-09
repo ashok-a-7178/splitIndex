@@ -24,7 +24,7 @@ public final class SplitConfig {
     public static final int NUM_UNIQUE_IDS = 10_000;
 
     /** Total number of documents to generate. */
-    public static final int TOTAL_DOCS = 40_000_000;
+    public static final int TOTAL_DOCS = 10_000_000;
 
     /** Target document size in bytes (approximately). */
     public static final int TARGET_DOC_SIZE_BYTES = 1024;
@@ -35,8 +35,7 @@ public final class SplitConfig {
     // ---- Directory paths ----
 
     /** Base directory for all benchmark data. */
-    public static final String BASE_DIR = System.getProperty("splitindex.basedir",
-            System.getProperty("java.io.tmpdir") + File.separator + "splitindex_benchmark");
+    public static final String BASE_DIR = "/Users/ashok-7178/AdminOP/luceneIndex";
 
     /** Source index directory. */
     public static final String SOURCE_INDEX_DIR = BASE_DIR + File.separator + "source_index";
@@ -54,6 +53,12 @@ public final class SplitConfig {
 
     /** Batch size for document indexing. */
     public static final int INDEX_BATCH_SIZE = 10_000;
+
+    /** Number of producer threads for parallel document creation. */
+    public static final int NUM_PRODUCER_THREADS = Runtime.getRuntime().availableProcessors();
+
+    /** Capacity of the document batch queue (number of batches buffered between producers and writer). */
+    public static final int QUEUE_CAPACITY = NUM_PRODUCER_THREADS * 2;
 
     /** Maximum number of boolean clauses per deletion query. */
     public static final int MAX_BOOLEAN_CLAUSES = 1024;

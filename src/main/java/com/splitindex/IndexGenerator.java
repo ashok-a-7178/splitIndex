@@ -23,6 +23,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Generates a test Lucene 4 index with {@link SplitConfig#NUM_FIELDS} fields
@@ -39,13 +47,37 @@ import java.util.Random;
  */
 public class IndexGenerator {
 
-    private static final Random RANDOM = new Random(42);
-
     /** Dictionary words loaded from the classpath resource. */
     private final String[] dictionary;
 
+    /** Pre-computed bytes-per-StringField (same for every document). */
+    private final int stringFieldBytes;
+
+    /** Pre-computed bytes-per-TextField (same for every document). */
+    private final int textFieldBytes;
+
     public IndexGenerator() throws IOException {
         this.dictionary = loadDictionary();
+
+        // Pre-compute field layout once (invariant across all documents)
+        int maxIdLength = ("ID_" + (SplitConfig.NUM_UNIQUE_IDS - 1)).length();
+        int fixedBytes = maxIdLength + 4; // ID string + docSequence int
+        int numStringFields = 0;
+        int numTextFields = 0;
+        for (int f = 2; f < SplitConfig.NUM_FIELDS; f++) {
+            switch (f % 5) {
+                case 0: numStringFields++; break;
+                case 1: numTextFields++;   break;
+                case 2: fixedBytes += 4;   break;
+                case 3: fixedBytes += 8;   break;
+                case 4: fixedBytes += 4;   break;
+            }
+        }
+        int textBudget = Math.max(0, SplitConfig.TARGET_DOC_SIZE_BYTES - fixedBytes);
+        int totalTextFields = numStringFields + numTextFields;
+        int bytesPerTextField = (totalTextFields > 0) ? textBudget / totalTextFields : 0;
+        this.stringFieldBytes = Math.max(4, (int) (bytesPerTextField * 0.4));
+        this.textFieldBytes   = Math.max(8, bytesPerTextField - this.stringFieldBytes);
     }
 
     /**
@@ -82,7 +114,14 @@ public class IndexGenerator {
     }
 
     /**
-     * Generates the source index at {@link SplitConfig#SOURCE_INDEX_DIR}.
+     * Generates the source index at {@link SplitConfig#SOURCE_INDEX_DIR}
+     * using a producer-consumer pattern:
+     * <ul>
+     *   <li>{@link SplitConfig#NUM_PRODUCER_THREADS} producer threads
+     *       create {@link Document} batches in parallel</li>
+     *   <li>The main thread acts as the consumer, writing batches to
+     *       the {@link IndexWriter}</li>
+     * </ul>
      *
      * @return elapsed time in milliseconds
      */
@@ -95,11 +134,13 @@ public class IndexGenerator {
         }
         sourceDir.mkdirs();
 
+        int numProducers = SplitConfig.NUM_PRODUCER_THREADS;
         System.out.println("[IndexGenerator] Generating index with " + SplitConfig.TOTAL_DOCS
                 + " docs, " + SplitConfig.NUM_FIELDS + " fields, "
                 + SplitConfig.NUM_UNIQUE_IDS + " unique IDs");
         System.out.println("[IndexGenerator] Target doc size: ~"
                 + SplitConfig.TARGET_DOC_SIZE_BYTES + " bytes");
+        System.out.println("[IndexGenerator] Using " + numProducers + " producer threads");
         System.out.println("[IndexGenerator] Target directory: " + sourceDir.getAbsolutePath());
 
         long start = System.currentTimeMillis();
@@ -111,29 +152,84 @@ public class IndexGenerator {
         try (FSDirectory dir = FSDirectory.open(sourceDir);
              IndexWriter writer = new IndexWriter(dir, config)) {
 
-            List<Document> batch = new ArrayList<>(SplitConfig.INDEX_BATCH_SIZE);
+            BlockingQueue<List<Document>> queue =
+                    new ArrayBlockingQueue<>(SplitConfig.QUEUE_CAPACITY);
+            CountDownLatch producersDone = new CountDownLatch(numProducers);
+            AtomicReference<Throwable> producerError = new AtomicReference<>();
 
-            for (int i = 0; i < SplitConfig.TOTAL_DOCS; i++) {
-                Document doc = createDocument(i);
-                batch.add(doc);
+            // --- Producer threads: create documents in parallel ---
+            ExecutorService producerPool = Executors.newFixedThreadPool(numProducers, r -> {
+                Thread t = new Thread(r, "doc-producer");
+                t.setDaemon(true);
+                return t;
+            });
 
-                if (batch.size() >= SplitConfig.INDEX_BATCH_SIZE) {
+            int docsPerProducer = SplitConfig.TOTAL_DOCS / numProducers;
+            for (int p = 0; p < numProducers; p++) {
+                int startDoc = p * docsPerProducer;
+                int endDoc = (p == numProducers - 1)
+                        ? SplitConfig.TOTAL_DOCS
+                        : startDoc + docsPerProducer;
+
+                producerPool.submit(() -> {
+                    try {
+                        Random rng = ThreadLocalRandom.current();
+                        List<Document> batch = new ArrayList<>(SplitConfig.INDEX_BATCH_SIZE);
+                        for (int i = startDoc; i < endDoc; i++) {
+                            if (producerError.get() != null) return;
+                            batch.add(createDocument(i, rng));
+                            if (batch.size() >= SplitConfig.INDEX_BATCH_SIZE) {
+                                queue.put(batch);
+                                batch = new ArrayList<>(SplitConfig.INDEX_BATCH_SIZE);
+                            }
+                        }
+                        if (!batch.isEmpty()) {
+                            queue.put(batch);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } catch (Throwable e) {
+                        producerError.compareAndSet(null, e);
+                    } finally {
+                        producersDone.countDown();
+                    }
+                });
+            }
+            producerPool.shutdown();
+
+            // --- Consumer: main thread writes batches to IndexWriter ---
+            int totalWritten = 0;
+            while (true) {
+                List<Document> batch = queue.poll(100, TimeUnit.MILLISECONDS);
+                if (batch != null) {
                     writer.addDocuments(batch);
-                    batch.clear();
-                    if ((i + 1) % 100_000 == 0) {
-                        System.out.println("[IndexGenerator] Indexed " + (i + 1) + " / " + SplitConfig.TOTAL_DOCS + " docs");
+                    totalWritten += batch.size();
+                    if (totalWritten % 100_000 < SplitConfig.INDEX_BATCH_SIZE) {
+                        System.out.println("[IndexGenerator] Indexed "
+                                + totalWritten + " / " + SplitConfig.TOTAL_DOCS + " docs");
                     }
                 }
-            }
-            if (!batch.isEmpty()) {
-                writer.addDocuments(batch);
+
+                Throwable err = producerError.get();
+                if (err != null) {
+                    producerPool.shutdownNow();
+                    throw new IOException("Producer thread failed", err);
+                }
+
+                if (producersDone.await(0, TimeUnit.MILLISECONDS) && queue.isEmpty()) {
+                    break;
+                }
             }
 
+            System.out.println("[IndexGenerator] All " + totalWritten + " docs indexed");
             System.out.println("[IndexGenerator] Committing...");
             writer.commit();
             System.out.println("[IndexGenerator] Optimizing (forceMerge to 1 segment)...");
             writer.forceMerge(1);
             writer.commit();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Index generation interrupted", e);
         }
 
         long elapsed = System.currentTimeMillis() - start;
@@ -143,150 +239,80 @@ public class IndexGenerator {
     }
 
     /**
-     * Creates a single Lucene document with {@link SplitConfig#NUM_FIELDS}
-     * fields whose combined stored content is approximately
-     * {@link SplitConfig#TARGET_DOC_SIZE_BYTES} bytes.
-     *
-     * <p>The field mix is:
-     * <ul>
-     *   <li>Field 0 – "ID" (StringField, round-robin unique IDs)</li>
-     *   <li>Field 1 – "docSequence" (IntField, document ordinal)</li>
-     *   <li>Fields 2..N – cycling through StringField (keyword from
-     *       dictionary), TextField (multi-word dictionary phrase),
-     *       IntField, LongField, and FloatField</li>
-     * </ul></p>
-     *
-     * <p>Text/String field lengths are calibrated so that the total stored
-     * value bytes across all fields approximate the target document size.</p>
+     * Creates a single Lucene document using pre-computed field layout
+     * constants and the supplied thread-local {@link Random}.
      */
-    private Document createDocument(int docIndex) {
+    private Document createDocument(int docIndex, Random rng) {
         Document doc = new Document();
 
-        // ---------- fixed-overhead fields ----------
-        // Field 0: ID (StringField, indexed but not tokenized)
         String idValue = "ID_" + (docIndex % SplitConfig.NUM_UNIQUE_IDS);
         doc.add(new StringField("ID", idValue, Field.Store.YES));
-
-        // Field 1: docSequence (stored integer for traceability)
         doc.add(new IntField("docSequence", docIndex, Field.Store.YES));
 
-        // ---------- budget calculation ----------
-        // Count the fixed-size bytes contributed by the non-text remaining
-        // fields and distribute the rest evenly across text-bearing fields.
-        int remaining = SplitConfig.NUM_FIELDS - 2; // fields 2..NUM_FIELDS-1
-
-        // Of every 5 fields: 1 StringField, 1 TextField, 1 Int, 1 Long, 1 Float
-        int numStringFields = 0;
-        int numTextFields = 0;
-        int fixedBytes = idValue.length() + 4; // ID value + docSequence int
-        for (int f = 2; f < SplitConfig.NUM_FIELDS; f++) {
-            switch (f % 5) {
-                case 0: numStringFields++; break;
-                case 1: numTextFields++;   break;
-                case 2: fixedBytes += 4;   break; // IntField  (4 bytes)
-                case 3: fixedBytes += 8;   break; // LongField (8 bytes)
-                case 4: fixedBytes += 4;   break; // FloatField(4 bytes)
-            }
-        }
-
-        int textBudget = SplitConfig.TARGET_DOC_SIZE_BYTES - fixedBytes;
-        if (textBudget < 0) textBudget = 0;
-
-        int totalTextFields = numStringFields + numTextFields;
-        int bytesPerTextField = (totalTextFields > 0)
-                ? textBudget / totalTextFields : 0;
-
-        // StringFields get ~40 % of per-field budget (short keywords);
-        // TextFields  get the remaining ~60 % (multi-word phrases).
-        int stringFieldBytes = Math.max(4, (int) (bytesPerTextField * 0.4));
-        int textFieldBytes   = Math.max(8, bytesPerTextField - stringFieldBytes);
-
-        // ---------- populate remaining fields ----------
-        int fieldIndex = 2;
-        while (fieldIndex < SplitConfig.NUM_FIELDS) {
-            int type = fieldIndex % 5;
+        for (int fieldIndex = 2; fieldIndex < SplitConfig.NUM_FIELDS; fieldIndex++) {
             String fieldName = "field_" + fieldIndex;
-            switch (type) {
+            switch (fieldIndex % 5) {
                 case 0:
-                    // StringField – single dictionary keyword
                     doc.add(new StringField(fieldName,
-                            dictionaryWord(stringFieldBytes), Field.Store.YES));
+                            dictionaryWord(stringFieldBytes, rng), Field.Store.YES));
                     break;
                 case 1:
-                    // TextField – multi-word dictionary phrase
                     doc.add(new TextField(fieldName,
-                            dictionaryPhrase(textFieldBytes), Field.Store.YES));
+                            dictionaryPhrase(textFieldBytes, rng), Field.Store.YES));
                     break;
                 case 2:
                     doc.add(new IntField(fieldName,
-                            RANDOM.nextInt(100_000), Field.Store.YES));
+                            rng.nextInt(100_000), Field.Store.YES));
                     break;
                 case 3:
                     doc.add(new LongField(fieldName,
-                            RANDOM.nextLong(), Field.Store.YES));
+                            rng.nextLong(), Field.Store.YES));
                     break;
                 case 4:
                     doc.add(new FloatField(fieldName,
-                            RANDOM.nextFloat() * 1000, Field.Store.YES));
+                            rng.nextFloat() * 1000, Field.Store.YES));
                     break;
                 default:
                     doc.add(new StringField(fieldName,
-                            dictionaryWord(stringFieldBytes), Field.Store.YES));
+                            dictionaryWord(stringFieldBytes, rng), Field.Store.YES));
                     break;
             }
-            fieldIndex++;
         }
 
         return doc;
     }
 
-    /**
-     * Returns a single dictionary word whose length is at most
-     * {@code targetBytes}.  Several random candidates are sampled and the
-     * one closest to (but not exceeding) the target length is returned,
-     * preserving whole-word integrity.
-     */
-    private String dictionaryWord(int targetBytes) {
+    private String dictionaryWord(int targetBytes, Random rng) {
         String best = null;
         for (int attempt = 0; attempt < 5; attempt++) {
-            String candidate = dictionary[RANDOM.nextInt(dictionary.length)];
+            String candidate = dictionary[rng.nextInt(dictionary.length)];
             if (candidate.length() <= targetBytes) {
                 if (best == null || candidate.length() > best.length()) {
                     best = candidate;
                 }
             }
         }
-        // Fallback: if all candidates were too long, just pick one that
-        // fits (dictionary contains words 3-12 chars, so targetBytes >= 3
-        // will almost always succeed above).
         if (best == null) {
-            best = dictionary[RANDOM.nextInt(dictionary.length)];
+            best = dictionary[rng.nextInt(dictionary.length)];
             while (best.length() > targetBytes) {
-                best = dictionary[RANDOM.nextInt(dictionary.length)];
+                best = dictionary[rng.nextInt(dictionary.length)];
             }
         }
         return best;
     }
 
-    /**
-     * Builds a multi-word phrase from dictionary words whose total length
-     * (including spaces) approximates {@code targetBytes}.  The result is
-     * trimmed at the last complete word boundary to avoid partial words.
-     */
-    private String dictionaryPhrase(int targetBytes) {
+    private String dictionaryPhrase(int targetBytes, Random rng) {
         StringBuilder sb = new StringBuilder(targetBytes);
         while (sb.length() < targetBytes) {
-            String word = dictionary[RANDOM.nextInt(dictionary.length)];
+            String word = dictionary[rng.nextInt(dictionary.length)];
             int needed = sb.length() == 0 ? word.length() : 1 + word.length();
             if (sb.length() + needed > targetBytes) {
-                // Adding this word would exceed the budget.  Try a shorter
-                // word a few times; if nothing fits, stop to keep whole words.
                 int remaining = targetBytes - sb.length()
                         - (sb.length() == 0 ? 0 : 1);
-                if (remaining < 3) break; // no room for any word
+                if (remaining < 3) break;
                 boolean fitted = false;
                 for (int retry = 0; retry < 5; retry++) {
-                    word = dictionary[RANDOM.nextInt(dictionary.length)];
+                    word = dictionary[rng.nextInt(dictionary.length)];
                     if (word.length() <= remaining) {
                         if (sb.length() > 0) sb.append(' ');
                         sb.append(word);
