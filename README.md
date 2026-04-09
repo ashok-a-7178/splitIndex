@@ -29,11 +29,13 @@ Split the index into **10 sub-indices** by partitioning the ID values using roun
 
 ```
 src/main/java/com/splitindex/
-├── SplitConfig.java             # Configuration constants (doc count, field count, paths, etc.)
-├── IndexGenerator.java          # Generates the test Lucene 4 index with 100 fields
-├── IndexSplitterCopy.java       # Approach 1: Sequential copy + BooleanQuery deletion
-├── IndexSplitterHardLink.java   # Approach 2: Hard link + BooleanQuery deletion
-└── SplitBenchmark.java          # Main benchmark runner with comparison output
+├── BenchmarkProfile.java          # Configurable benchmark profile (5GB, 10GB, custom)
+├── SplitConfig.java               # Default configuration constants (doc count, field count, paths, etc.)
+├── IndexGenerator.java            # Generates the test Lucene 4 index with 100 fields
+├── IndexSplitterCopy.java         # Approach 1: Sequential copy + BooleanQuery deletion
+├── IndexSplitterHardLink.java     # Approach 2: Hard link + BooleanQuery deletion
+├── SplitBenchmark.java            # Main benchmark runner with comparison output (default config)
+└── SampleIndexBenchmark.java      # Sample 5GB & 10GB index benchmarks
 ```
 
 ## Prerequisites
@@ -68,6 +70,21 @@ mvn exec:java -Dexec.args="hardlink"
 
 # Clean all benchmark data
 mvn exec:java -Dexec.args="clean"
+```
+
+### Sample Index Benchmarks (5 GB and 10 GB)
+```bash
+# Run both 5GB and 10GB benchmarks
+mvn exec:java -Dexec.mainClass=com.splitindex.SampleIndexBenchmark
+
+# Run only the 5GB benchmark
+mvn exec:java -Dexec.mainClass=com.splitindex.SampleIndexBenchmark -Dexec.args="5gb"
+
+# Run only the 10GB benchmark
+mvn exec:java -Dexec.mainClass=com.splitindex.SampleIndexBenchmark -Dexec.args="10gb"
+
+# Clean sample benchmark data
+mvn exec:java -Dexec.mainClass=com.splitindex.SampleIndexBenchmark -Dexec.args="clean"
 ```
 
 ### Custom Base Directory

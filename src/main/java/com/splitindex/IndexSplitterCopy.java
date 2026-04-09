@@ -34,6 +34,24 @@ import java.util.List;
  */
 public class IndexSplitterCopy {
 
+    private final BenchmarkProfile profile;
+
+    /**
+     * Creates a splitter using the default {@link SplitConfig} constants.
+     */
+    public IndexSplitterCopy() {
+        this(BenchmarkProfile.fromSplitConfig());
+    }
+
+    /**
+     * Creates a splitter using the supplied {@link BenchmarkProfile}.
+     *
+     * @param profile benchmark configuration
+     */
+    public IndexSplitterCopy(BenchmarkProfile profile) {
+        this.profile = profile;
+    }
+
     /**
      * Runs the copy-based split benchmark.
      *
@@ -44,7 +62,7 @@ public class IndexSplitterCopy {
         System.out.println("  APPROACH 1: Sequential Copy + Delete  ");
         System.out.println("========================================\n");
 
-        File sourceDir = new File(SplitConfig.SOURCE_INDEX_DIR);
+        File sourceDir = new File(profile.getSourceIndexDir());
         if (!sourceDir.exists()) {
             throw new IOException("Source index not found at: " + sourceDir.getAbsolutePath());
         }
@@ -55,25 +73,25 @@ public class IndexSplitterCopy {
 
         // Assign IDs to partitions (round-robin)
         @SuppressWarnings("unchecked")
-        List<String>[] partitionIds = new List[SplitConfig.NUM_SPLITS];
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
+        List<String>[] partitionIds = new List[profile.getNumSplits()];
+        for (int i = 0; i < profile.getNumSplits(); i++) {
             partitionIds[i] = new ArrayList<>();
         }
         for (int i = 0; i < uniqueIds.size(); i++) {
-            partitionIds[i % SplitConfig.NUM_SPLITS].add(uniqueIds.get(i));
+            partitionIds[i % profile.getNumSplits()].add(uniqueIds.get(i));
         }
 
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
+        for (int i = 0; i < profile.getNumSplits(); i++) {
             System.out.println("[Copy] Partition " + i + " keeps " + partitionIds[i].size() + " IDs");
         }
 
         long totalStart = System.currentTimeMillis();
 
         // Phase 1: Copy source index to all target directories
-        System.out.println("\n[Copy] Phase 1: Copying source index to " + SplitConfig.NUM_SPLITS + " directories...");
+        System.out.println("\n[Copy] Phase 1: Copying source index to " + profile.getNumSplits() + " directories...");
         long copyStart = System.currentTimeMillis();
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
-            File targetDir = new File(SplitConfig.COPY_SPLIT_DIR_PREFIX + i);
+        for (int i = 0; i < profile.getNumSplits(); i++) {
+            File targetDir = new File(profile.getCopySplitDirPrefix() + i);
             copyDirectory(sourceDir, targetDir);
             System.out.println("[Copy]   Copied to dir" + i + " (" + IndexGenerator.dirSizeMB(targetDir) + " MB)");
         }
@@ -83,8 +101,8 @@ public class IndexSplitterCopy {
         // Phase 2: Delete non-matching IDs from each partition
         System.out.println("\n[Copy] Phase 2: Deleting non-matching documents from each partition...");
         long deleteStart = System.currentTimeMillis();
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
-            File targetDir = new File(SplitConfig.COPY_SPLIT_DIR_PREFIX + i);
+        for (int i = 0; i < profile.getNumSplits(); i++) {
+            File targetDir = new File(profile.getCopySplitDirPrefix() + i);
             deleteNonMatchingDocs(targetDir, partitionIds[i], i);
         }
         long deleteTime = System.currentTimeMillis() - deleteStart;
@@ -106,8 +124,8 @@ public class IndexSplitterCopy {
      */
     private List<String> collectUniqueIds() throws IOException {
         // Since we know the ID pattern, we generate them deterministically
-        List<String> ids = new ArrayList<>(SplitConfig.NUM_UNIQUE_IDS);
-        for (int i = 0; i < SplitConfig.NUM_UNIQUE_IDS; i++) {
+        List<String> ids = new ArrayList<>(profile.getNumUniqueIds());
+        for (int i = 0; i < profile.getNumUniqueIds(); i++) {
             ids.add("ID_" + i);
         }
         return ids;
@@ -163,14 +181,14 @@ public class IndexSplitterCopy {
                 + ": deleting " + deleteIds.size() + " IDs, keeping " + keepIds.size() + " IDs");
 
         IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_4_10_4, new StandardAnalyzer());
-        config.setRAMBufferSizeMB(SplitConfig.RAM_BUFFER_SIZE_MB);
+        config.setRAMBufferSizeMB(profile.getRamBufferSizeMB());
         config.setOpenMode(IndexWriterConfig.OpenMode.APPEND);
 
         try (FSDirectory dir = FSDirectory.open(targetDir);
              IndexWriter writer = new IndexWriter(dir, config)) {
 
             // Delete in batches to respect BooleanQuery max clause count
-            int batchSize = SplitConfig.MAX_BOOLEAN_CLAUSES;
+            int batchSize = profile.getMaxBooleanClauses();
             for (int start = 0; start < deleteIds.size(); start += batchSize) {
                 int end = Math.min(start + batchSize, deleteIds.size());
                 BooleanQuery bq = new BooleanQuery();
@@ -195,8 +213,8 @@ public class IndexSplitterCopy {
     private void printPartitionStats() throws IOException {
         System.out.println("\n[Copy] Final partition statistics:");
         long totalDocs = 0;
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
-            File targetDir = new File(SplitConfig.COPY_SPLIT_DIR_PREFIX + i);
+        for (int i = 0; i < profile.getNumSplits(); i++) {
+            File targetDir = new File(profile.getCopySplitDirPrefix() + i);
             try (FSDirectory dir = FSDirectory.open(targetDir);
                  IndexReader reader = DirectoryReader.open(dir)) {
                 int numDocs = reader.numDocs();

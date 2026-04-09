@@ -56,15 +56,31 @@ public class IndexGenerator {
     /** Pre-computed bytes-per-TextField (same for every document). */
     private final int textFieldBytes;
 
+    /** Configuration profile for this generator. */
+    private final BenchmarkProfile profile;
+
+    /**
+     * Creates a generator using the default {@link SplitConfig} constants.
+     */
     public IndexGenerator() throws IOException {
+        this(BenchmarkProfile.fromSplitConfig());
+    }
+
+    /**
+     * Creates a generator using the supplied {@link BenchmarkProfile}.
+     *
+     * @param profile benchmark configuration (doc count, field count, paths, etc.)
+     */
+    public IndexGenerator(BenchmarkProfile profile) throws IOException {
+        this.profile = profile;
         this.dictionary = loadDictionary();
 
         // Pre-compute field layout once (invariant across all documents)
-        int maxIdLength = ("ID_" + (SplitConfig.NUM_UNIQUE_IDS - 1)).length();
+        int maxIdLength = ("ID_" + (profile.getNumUniqueIds() - 1)).length();
         int fixedBytes = maxIdLength + 4; // ID string + docSequence int
         int numStringFields = 0;
         int numTextFields = 0;
-        for (int f = 2; f < SplitConfig.NUM_FIELDS; f++) {
+        for (int f = 2; f < profile.getNumFields(); f++) {
             switch (f % 5) {
                 case 0: numStringFields++; break;
                 case 1: numTextFields++;   break;
@@ -73,7 +89,7 @@ public class IndexGenerator {
                 case 4: fixedBytes += 4;   break;
             }
         }
-        int textBudget = Math.max(0, SplitConfig.TARGET_DOC_SIZE_BYTES - fixedBytes);
+        int textBudget = Math.max(0, profile.getTargetDocSizeBytes() - fixedBytes);
         int totalTextFields = numStringFields + numTextFields;
         int bytesPerTextField = (totalTextFields > 0) ? textBudget / totalTextFields : 0;
         this.stringFieldBytes = Math.max(4, (int) (bytesPerTextField * 0.4));
@@ -125,8 +141,13 @@ public class IndexGenerator {
      *
      * @return elapsed time in milliseconds
      */
+    /** Returns the profile used by this generator. */
+    public BenchmarkProfile getProfile() {
+        return profile;
+    }
+
     public long generate() throws IOException {
-        File sourceDir = new File(SplitConfig.SOURCE_INDEX_DIR);
+        File sourceDir = new File(profile.getSourceIndexDir());
         if (sourceDir.exists() && sourceDir.list() != null && sourceDir.list().length > 0) {
             System.out.println("[IndexGenerator] Source index already exists at: " + sourceDir.getAbsolutePath());
             System.out.println("[IndexGenerator] Skipping generation. Delete the directory to regenerate.");
@@ -135,25 +156,26 @@ public class IndexGenerator {
         sourceDir.mkdirs();
 
         int numProducers = SplitConfig.NUM_PRODUCER_THREADS;
-        System.out.println("[IndexGenerator] Generating index with " + SplitConfig.TOTAL_DOCS
-                + " docs, " + SplitConfig.NUM_FIELDS + " fields, "
-                + SplitConfig.NUM_UNIQUE_IDS + " unique IDs");
+        System.out.println("[IndexGenerator] Generating index with " + profile.getTotalDocs()
+                + " docs, " + profile.getNumFields() + " fields, "
+                + profile.getNumUniqueIds() + " unique IDs");
         System.out.println("[IndexGenerator] Target doc size: ~"
-                + SplitConfig.TARGET_DOC_SIZE_BYTES + " bytes");
+                + profile.getTargetDocSizeBytes() + " bytes");
         System.out.println("[IndexGenerator] Using " + numProducers + " producer threads");
         System.out.println("[IndexGenerator] Target directory: " + sourceDir.getAbsolutePath());
 
         long start = System.currentTimeMillis();
 
         IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_4_10_4, new StandardAnalyzer());
-        config.setRAMBufferSizeMB(SplitConfig.RAM_BUFFER_SIZE_MB);
+        config.setRAMBufferSizeMB(profile.getRamBufferSizeMB());
         config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
 
         try (FSDirectory dir = FSDirectory.open(sourceDir);
              IndexWriter writer = new IndexWriter(dir, config)) {
 
+            int queueCapacity = SplitConfig.NUM_PRODUCER_THREADS * 2;
             BlockingQueue<List<Document>> queue =
-                    new ArrayBlockingQueue<>(SplitConfig.QUEUE_CAPACITY);
+                    new ArrayBlockingQueue<>(queueCapacity);
             CountDownLatch producersDone = new CountDownLatch(numProducers);
             AtomicReference<Throwable> producerError = new AtomicReference<>();
 
@@ -164,23 +186,23 @@ public class IndexGenerator {
                 return t;
             });
 
-            int docsPerProducer = SplitConfig.TOTAL_DOCS / numProducers;
+            int docsPerProducer = profile.getTotalDocs() / numProducers;
             for (int p = 0; p < numProducers; p++) {
                 int startDoc = p * docsPerProducer;
                 int endDoc = (p == numProducers - 1)
-                        ? SplitConfig.TOTAL_DOCS
+                        ? profile.getTotalDocs()
                         : startDoc + docsPerProducer;
 
                 producerPool.submit(() -> {
                     try {
                         Random rng = ThreadLocalRandom.current();
-                        List<Document> batch = new ArrayList<>(SplitConfig.INDEX_BATCH_SIZE);
+                        List<Document> batch = new ArrayList<>(profile.getIndexBatchSize());
                         for (int i = startDoc; i < endDoc; i++) {
                             if (producerError.get() != null) return;
                             batch.add(createDocument(i, rng));
-                            if (batch.size() >= SplitConfig.INDEX_BATCH_SIZE) {
+                            if (batch.size() >= profile.getIndexBatchSize()) {
                                 queue.put(batch);
-                                batch = new ArrayList<>(SplitConfig.INDEX_BATCH_SIZE);
+                                batch = new ArrayList<>(profile.getIndexBatchSize());
                             }
                         }
                         if (!batch.isEmpty()) {
@@ -204,9 +226,9 @@ public class IndexGenerator {
                 if (batch != null) {
                     writer.addDocuments(batch);
                     totalWritten += batch.size();
-                    if (totalWritten % 100_000 < SplitConfig.INDEX_BATCH_SIZE) {
+                    if (totalWritten % 100_000 < profile.getIndexBatchSize()) {
                         System.out.println("[IndexGenerator] Indexed "
-                                + totalWritten + " / " + SplitConfig.TOTAL_DOCS + " docs");
+                                + totalWritten + " / " + profile.getTotalDocs() + " docs");
                     }
                 }
 
@@ -245,11 +267,11 @@ public class IndexGenerator {
     private Document createDocument(int docIndex, Random rng) {
         Document doc = new Document();
 
-        String idValue = "ID_" + (docIndex % SplitConfig.NUM_UNIQUE_IDS);
+        String idValue = "ID_" + (docIndex % profile.getNumUniqueIds());
         doc.add(new StringField("ID", idValue, Field.Store.YES));
         doc.add(new IntField("docSequence", docIndex, Field.Store.YES));
 
-        for (int fieldIndex = 2; fieldIndex < SplitConfig.NUM_FIELDS; fieldIndex++) {
+        for (int fieldIndex = 2; fieldIndex < profile.getNumFields(); fieldIndex++) {
             String fieldName = "field_" + fieldIndex;
             switch (fieldIndex % 5) {
                 case 0:

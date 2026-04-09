@@ -41,6 +41,24 @@ import java.util.List;
  */
 public class IndexSplitterHardLink {
 
+    private final BenchmarkProfile profile;
+
+    /**
+     * Creates a splitter using the default {@link SplitConfig} constants.
+     */
+    public IndexSplitterHardLink() {
+        this(BenchmarkProfile.fromSplitConfig());
+    }
+
+    /**
+     * Creates a splitter using the supplied {@link BenchmarkProfile}.
+     *
+     * @param profile benchmark configuration
+     */
+    public IndexSplitterHardLink(BenchmarkProfile profile) {
+        this.profile = profile;
+    }
+
     /**
      * Runs the hard-link-based split benchmark.
      *
@@ -51,7 +69,7 @@ public class IndexSplitterHardLink {
         System.out.println("  APPROACH 2: Hard Link + Delete        ");
         System.out.println("========================================\n");
 
-        File sourceDir = new File(SplitConfig.SOURCE_INDEX_DIR);
+        File sourceDir = new File(profile.getSourceIndexDir());
         if (!sourceDir.exists()) {
             throw new IOException("Source index not found at: " + sourceDir.getAbsolutePath());
         }
@@ -62,25 +80,25 @@ public class IndexSplitterHardLink {
 
         // Assign IDs to partitions (round-robin)
         @SuppressWarnings("unchecked")
-        List<String>[] partitionIds = new List[SplitConfig.NUM_SPLITS];
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
+        List<String>[] partitionIds = new List[profile.getNumSplits()];
+        for (int i = 0; i < profile.getNumSplits(); i++) {
             partitionIds[i] = new ArrayList<>();
         }
         for (int i = 0; i < uniqueIds.size(); i++) {
-            partitionIds[i % SplitConfig.NUM_SPLITS].add(uniqueIds.get(i));
+            partitionIds[i % profile.getNumSplits()].add(uniqueIds.get(i));
         }
 
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
+        for (int i = 0; i < profile.getNumSplits(); i++) {
             System.out.println("[HardLink] Partition " + i + " keeps " + partitionIds[i].size() + " IDs");
         }
 
         long totalStart = System.currentTimeMillis();
 
         // Phase 1: Create hard links from source to all target directories
-        System.out.println("\n[HardLink] Phase 1: Creating hard links to " + SplitConfig.NUM_SPLITS + " directories...");
+        System.out.println("\n[HardLink] Phase 1: Creating hard links to " + profile.getNumSplits() + " directories...");
         long linkStart = System.currentTimeMillis();
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
-            File targetDir = new File(SplitConfig.HARDLINK_SPLIT_DIR_PREFIX + i);
+        for (int i = 0; i < profile.getNumSplits(); i++) {
+            File targetDir = new File(profile.getHardlinkSplitDirPrefix() + i);
             hardLinkDirectory(sourceDir, targetDir);
             System.out.println("[HardLink]   Linked to dir" + i);
         }
@@ -90,8 +108,8 @@ public class IndexSplitterHardLink {
         // Phase 2: Delete non-matching IDs from each partition
         System.out.println("\n[HardLink] Phase 2: Deleting non-matching documents from each partition...");
         long deleteStart = System.currentTimeMillis();
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
-            File targetDir = new File(SplitConfig.HARDLINK_SPLIT_DIR_PREFIX + i);
+        for (int i = 0; i < profile.getNumSplits(); i++) {
+            File targetDir = new File(profile.getHardlinkSplitDirPrefix() + i);
             deleteNonMatchingDocs(targetDir, partitionIds[i], i);
         }
         long deleteTime = System.currentTimeMillis() - deleteStart;
@@ -112,8 +130,8 @@ public class IndexSplitterHardLink {
      * Collects all unique ID values (generated deterministically).
      */
     private List<String> collectUniqueIds() {
-        List<String> ids = new ArrayList<>(SplitConfig.NUM_UNIQUE_IDS);
-        for (int i = 0; i < SplitConfig.NUM_UNIQUE_IDS; i++) {
+        List<String> ids = new ArrayList<>(profile.getNumUniqueIds());
+        for (int i = 0; i < profile.getNumUniqueIds(); i++) {
             ids.add("ID_" + i);
         }
         return ids;
@@ -166,14 +184,14 @@ public class IndexSplitterHardLink {
                 + ": deleting " + deleteIds.size() + " IDs, keeping " + keepIds.size() + " IDs");
 
         IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_4_10_4, new StandardAnalyzer());
-        config.setRAMBufferSizeMB(SplitConfig.RAM_BUFFER_SIZE_MB);
+        config.setRAMBufferSizeMB(profile.getRamBufferSizeMB());
         config.setOpenMode(IndexWriterConfig.OpenMode.APPEND);
 
         try (FSDirectory dir = FSDirectory.open(targetDir);
              IndexWriter writer = new IndexWriter(dir, config)) {
 
             // Delete in batches to respect BooleanQuery max clause count
-            int batchSize = SplitConfig.MAX_BOOLEAN_CLAUSES;
+            int batchSize = profile.getMaxBooleanClauses();
             for (int start = 0; start < deleteIds.size(); start += batchSize) {
                 int end = Math.min(start + batchSize, deleteIds.size());
                 BooleanQuery bq = new BooleanQuery();
@@ -198,8 +216,8 @@ public class IndexSplitterHardLink {
     private void printPartitionStats() throws IOException {
         System.out.println("\n[HardLink] Final partition statistics:");
         long totalDocs = 0;
-        for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
-            File targetDir = new File(SplitConfig.HARDLINK_SPLIT_DIR_PREFIX + i);
+        for (int i = 0; i < profile.getNumSplits(); i++) {
+            File targetDir = new File(profile.getHardlinkSplitDirPrefix() + i);
             try (FSDirectory dir = FSDirectory.open(targetDir);
                  IndexReader reader = DirectoryReader.open(dir)) {
                 int numDocs = reader.numDocs();
