@@ -1,0 +1,680 @@
+# Java Hard Links: How They Work and Why Lucene Indexes Are the Perfect Use Case
+
+## Table of Contents
+- [1. What Is a Hard Link?](#1-what-is-a-hard-link)
+- [2. Java Hard Links — High-Level Overview](#2-java-hard-links--high-level-overview)
+- [3. Java Hard Links — Low-Level Internals](#3-java-hard-links--low-level-internals)
+- [4. Hard Links vs. Soft Links vs. File Copy](#4-hard-links-vs-soft-links-vs-file-copy)
+- [5. Lucene Index Architecture](#5-lucene-index-architecture)
+- [6. Why Lucene Indexes Are Ideal for Hard Links](#6-why-lucene-indexes-are-ideal-for-hard-links)
+- [7. Demonstration: Hard-Link-Based Index Splitting](#7-demonstration-hard-link-based-index-splitting)
+- [8. Benchmark Evidence](#8-benchmark-evidence)
+- [9. Caveats and Constraints](#9-caveats-and-constraints)
+- [10. Summary](#10-summary)
+
+---
+
+## 1. What Is a Hard Link?
+
+A **hard link** is a directory entry that points directly to the same **inode** (the
+filesystem's internal data structure that represents a file's contents) as another
+directory entry. Unlike a file copy, a hard link does not duplicate any data on disk.
+Both the original path and the hard-linked path refer to the exact same physical data
+blocks.
+
+```
+  Directory A               Directory B
+  ┌─────────┐               ┌─────────┐
+  │ file.txt │───┐     ┌────│ file.txt │
+  └─────────┘   │     │    └─────────┘
+                │     │
+                ▼     ▼
+            ┌──────────────┐
+            │    Inode 42   │  ← Reference count = 2
+            │  (metadata)   │
+            └──────┬───────┘
+                   │
+                   ▼
+            ┌──────────────┐
+            │  Data Blocks  │  ← Actual file content on disk
+            │  (shared)     │
+            └──────────────┘
+```
+
+**Key properties of hard links:**
+- Multiple directory entries, one set of data blocks
+- The file is only truly deleted when the **last** hard link is removed (reference count drops to 0)
+- All hard links are equal — there is no "original" vs "link"; they are all equivalent names for the same inode
+- Hard links cannot cross filesystem boundaries
+- Hard links cannot point to directories (on most POSIX systems)
+
+---
+
+## 2. Java Hard Links — High-Level Overview
+
+Since **Java 7 (NIO.2)**, the `java.nio.file` package provides a clean API for
+creating hard links through `Files.createLink()`.
+
+### API Signature
+
+```java
+public static Path Files.createLink(Path link, Path existing) throws IOException
+```
+
+- `link` — the new directory entry to create (the hard link path)
+- `existing` — the existing file whose inode the link will point to
+- Returns the `link` path on success
+
+### High-Level Usage
+
+```java
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+// Create a hard link: targetDir/data.txt → sourceDir/data.txt
+Path existing = Paths.get("/data/sourceDir/data.txt");
+Path link     = Paths.get("/data/targetDir/data.txt");
+
+Files.createLink(link, existing);
+```
+
+After this call:
+- Both paths point to the **same inode** and the **same data blocks** on disk
+- Reading from either path returns identical content
+- The file's inode reference count is incremented from 1 to 2
+- **No data is copied** — the operation is O(1) in terms of file size
+
+### High-Level Characteristics
+
+| Property              | Value                                          |
+|-----------------------|------------------------------------------------|
+| Time complexity       | O(1) — independent of file size                |
+| Disk space used       | 0 bytes additional (metadata only, ~few bytes) |
+| Cross-filesystem      | Not supported — both paths must be on same FS  |
+| Atomic                | Yes — creating a link is an atomic FS operation|
+| Java version required | Java 7+ (NIO.2)                                |
+| Platform support      | Linux, macOS, Windows (NTFS), most POSIX       |
+
+---
+
+## 3. Java Hard Links — Low-Level Internals
+
+### 3.1 What Happens Inside `Files.createLink()`
+
+When you call `Files.createLink(link, existing)`, Java performs the following
+operations under the hood:
+
+```
+  Java Application
+       │
+       ▼
+  Files.createLink(link, existing)
+       │
+       ▼
+  java.nio.file.spi.FileSystemProvider.createLink()
+       │
+       ▼
+  sun.nio.fs.UnixFileSystemProvider.createLink()   [on Linux/macOS]
+  sun.nio.fs.WindowsFileSystemProvider.createLink() [on Windows]
+       │
+       ▼
+  Native method invocation (JNI)
+       │
+       ▼
+  POSIX: link(2) system call     [Linux/macOS]
+  Win32: CreateHardLinkW()       [Windows NTFS]
+       │
+       ▼
+  Kernel / VFS layer
+       │
+       ▼
+  Filesystem driver (ext4, XFS, NTFS, etc.)
+```
+
+### 3.2 The POSIX `link(2)` System Call
+
+On Linux/macOS, the JVM ultimately calls the POSIX `link()` system call:
+
+```c
+#include <unistd.h>
+int link(const char *existing_path, const char *new_path);
+```
+
+This system call instructs the kernel to:
+
+1. **Resolve the inode** of `existing_path` by traversing the directory tree
+2. **Create a new directory entry** in the parent directory of `new_path`
+3. **Point the new entry to the same inode** as `existing_path`
+4. **Increment the inode's link count** (`i_nlink`) by 1
+5. **Return 0** on success, or -1 on error (with `errno` set)
+
+### 3.3 Inode Anatomy
+
+Every file on a POSIX filesystem is represented by an **inode**, which stores:
+
+```
+  Inode Structure (ext4 example)
+  ┌────────────────────────────────┐
+  │ i_mode    : file type + perms  │
+  │ i_uid     : owner user ID     │
+  │ i_gid     : owner group ID    │
+  │ i_size    : file size in bytes │
+  │ i_nlink   : hard link count   │  ← THIS IS THE KEY FIELD
+  │ i_atime   : last access time  │
+  │ i_mtime   : last modified time│
+  │ i_ctime   : last change time  │
+  │ i_blocks  : block count       │
+  │ i_block[] : pointers to data  │  ← Points to actual file content
+  └────────────────────────────────┘
+```
+
+When a hard link is created, **only `i_nlink` changes**. The data blocks referenced
+by `i_block[]` remain completely untouched. This is why creating a hard link to a
+20 GB file takes the same time as creating a hard link to a 1 KB file.
+
+### 3.4 Reference Counting and Deletion
+
+The kernel uses the `i_nlink` count to manage the file's lifecycle:
+
+```
+  Initial state (1 path):
+    /source/file.txt → Inode 42 (i_nlink = 1)
+
+  After Files.createLink():
+    /source/file.txt → Inode 42 (i_nlink = 2)
+    /target/file.txt → Inode 42 (i_nlink = 2)
+
+  After deleting /source/file.txt:
+    /target/file.txt → Inode 42 (i_nlink = 1)
+    Data blocks are NOT freed (i_nlink > 0)
+
+  After deleting /target/file.txt:
+    Inode 42 (i_nlink = 0) → data blocks freed
+```
+
+The file's data blocks are only reclaimed by the filesystem when `i_nlink` reaches
+zero **and** no process has the file open.
+
+### 3.5 Copy-on-Write Behavior (Not Built-In)
+
+Hard links do **not** provide copy-on-write semantics. If you open a hard-linked
+file and write to it, **all paths see the change** because they share the same
+inode and data blocks.
+
+However, this is not a problem for Lucene indexes because Lucene uses an
+**append-only, write-once** file strategy — it never modifies existing segment
+files. More on this in Section 6.
+
+---
+
+## 4. Hard Links vs. Soft Links vs. File Copy
+
+| Feature                 | Hard Link              | Soft Link (Symlink)       | File Copy              |
+|-------------------------|------------------------|---------------------------|------------------------|
+| **Creates new inode?**  | No                     | Yes (new inode for link)  | Yes (new inode + data) |
+| **Copies data blocks?** | No                     | No                        | Yes                    |
+| **Disk space**          | ~0 (metadata only)     | ~few bytes (path string)  | Full duplicate         |
+| **Time complexity**     | O(1)                   | O(1)                      | O(file size)           |
+| **Cross-filesystem?**   | No                     | Yes                       | Yes                    |
+| **Survives target deletion?** | Yes (independent) | No (becomes dangling)     | Yes (independent)      |
+| **Modification visible to other?** | Yes (shared data) | Yes (same target)    | No (independent copy)  |
+| **Java API**            | `Files.createLink()`   | `Files.createSymbolicLink()` | `Files.copy()`      |
+| **For 19 GB, 10 copies**| ~346 ms, 0 GB extra   | ~instant, 0 GB extra      | ~621 sec, 190 GB extra |
+
+---
+
+## 5. Lucene Index Architecture
+
+To understand why hard links work so well with Lucene, we need to understand how
+Lucene stores its index on disk.
+
+### 5.1 Segment-Based Architecture
+
+A Lucene index is not a single monolithic file. It is composed of multiple
+**segments**, each of which is a self-contained mini-index:
+
+```
+  Lucene Index Directory
+  ┌─────────────────────────────────────────────────────┐
+  │                                                     │
+  │  segments.gen          ← Generation metadata        │
+  │  segments_N            ← Commit point (segment list)│
+  │                                                     │
+  │  _0.cfs   _0.cfe      ← Segment 0 (compound file)  │
+  │  _1.cfs   _1.cfe      ← Segment 1 (compound file)  │
+  │  _2.cfs   _2.cfe      ← Segment 2 (compound file)  │
+  │  ...                                                │
+  │                                                     │
+  │  _0.si                 ← Segment 0 info             │
+  │  _1.si                 ← Segment 1 info             │
+  │  _2.si                 ← Segment 2 info             │
+  │  ...                                                │
+  │                                                     │
+  │  write.lock            ← Writer lock file           │
+  │                                                     │
+  └─────────────────────────────────────────────────────┘
+```
+
+### 5.2 Immutability of Segment Files
+
+**This is the critical property that makes hard links viable:**
+
+Once a Lucene segment file is written and committed, it is **never modified**.
+Lucene follows a strict write-once policy:
+
+- **New documents** are written to **new segment files**
+- **Deleted documents** are tracked in a separate `.del` or `.liv` file — the
+  original segment data is not modified
+- **Merges** read from old segments and write to **new segment files**; the old
+  segments are then deleted
+- **Updates** are implemented as delete + re-add (again producing new segments)
+
+```
+  Time ──────────────────────────────────────────────►
+
+  T0: Index has segments [_0, _1, _2]
+      All files are immutable after commit
+
+  T1: New documents added → new segment _3 created
+      Segments [_0, _1, _2] remain unchanged
+
+  T2: Segments _0 and _1 merged → new segment _4 created
+      _0 and _1 are deleted; _4 is now immutable
+
+  T3: Documents deleted from _2 → _2_1.del created
+      _2.cfs remains unchanged (only a .del file is added)
+```
+
+### 5.3 File Types in a Lucene Index
+
+| Extension      | Purpose                            | Mutable? |
+|----------------|------------------------------------|----------|
+| `segments_N`   | Commit point / segment list        | Replaced (new file per commit) |
+| `.cfs`         | Compound segment data              | **Immutable** |
+| `.cfe`         | Compound segment entries           | **Immutable** |
+| `.si`          | Segment info                       | **Immutable** |
+| `.fnm`         | Field names/metadata               | **Immutable** |
+| `.fdx` / `.fdt`| Stored fields index/data           | **Immutable** |
+| `.tim` / `.tip`| Term dictionary / index            | **Immutable** |
+| `.doc`         | Document frequencies               | **Immutable** |
+| `.pos`         | Term positions                     | **Immutable** |
+| `.del` / `.liv`| Deleted documents bitmap           | New file per change |
+| `write.lock`   | Writer lock                        | Created/deleted |
+
+**Almost every file in a Lucene index is immutable after creation.**
+
+---
+
+## 6. Why Lucene Indexes Are Ideal for Hard Links
+
+The combination of Lucene's architecture and hard link behavior creates a
+**perfect synergy** for index splitting, replication, and snapshotting. Here's why:
+
+### 6.1 Immutable Files Eliminate the Shared-Write Problem
+
+The primary risk with hard links is that writing to a file through one path
+affects all other paths (since they share the same data blocks). With Lucene,
+this risk **does not exist** because:
+
+- Segment files are **write-once** — after creation, they are only read
+- Modifications create **new files** rather than modifying existing ones
+- The `IndexWriter` never opens existing segment files for writing
+
+```
+  Hard-linked Lucene index (safe):
+
+  Directory A                    Directory B
+  ┌──────────┐                   ┌──────────┐
+  │ _0.cfs ──┼───► Inode 100 ◄──┼── _0.cfs  │  Shared, but NEVER written to
+  │ _1.cfs ──┼───► Inode 101 ◄──┼── _1.cfs  │  Shared, but NEVER written to
+  │ _2.cfs ──┼───► Inode 102 ◄──┼── _2.cfs  │  Shared, but NEVER written to
+  └──────────┘                   └──────────┘
+
+  When IndexWriter in Dir A creates new segments or deletes docs:
+  - New files (_3.cfs, _0_1.del) are created only in Dir A
+  - Existing shared files (_0.cfs, _1.cfs, _2.cfs) are NEVER modified
+  - Dir B is completely unaffected
+```
+
+### 6.2 O(files) Instead of O(bytes)
+
+Creating hard links to an entire Lucene index directory requires iterating over
+the files and calling `Files.createLink()` for each one. The time is proportional
+to the **number of files**, not the **total data size**:
+
+```
+  File Copy:   O(total_bytes)  → 19 GB = 621,546 ms
+  Hard Link:   O(num_files)    → ~30 files = 346 ms
+
+  Speedup: 1,796x for a 19 GB index
+```
+
+### 6.3 Lucene's Delete-Then-Merge Pattern Complements Hard Links
+
+When splitting an index via the "link + delete + merge" strategy:
+
+```
+  Step 1: Hard link all source files to target directory
+          → O(num_files), ~instant, zero additional disk space
+
+  Step 2: Open IndexWriter on target, delete unwanted documents
+          → Creates new .del file (small), original segments unchanged
+
+  Step 3: Force-merge to reclaim space
+          → IndexWriter reads shared segments, writes NEW segment files
+          → Old hard-linked files' reference count decrements
+          → If no other links remain, old data blocks are freed
+          → New merged segment is private to this directory
+```
+
+After the force-merge:
+- The target directory contains **only its own data** (new segment files)
+- The source directory's files are **unaffected**
+- Disk space is reclaimed naturally through inode reference counting
+
+### 6.4 Temporary Disk Space Savings
+
+During the split process, the disk space advantage is enormous:
+
+```
+  File Copy approach (10 splits of a 19 GB index):
+  ┌──────────────────────────────────────────────┐
+  │ Source:  19 GB                               │
+  │ Copy 0:  19 GB  ← full duplicate             │
+  │ Copy 1:  19 GB  ← full duplicate             │
+  │ ...                                          │
+  │ Copy 9:  19 GB  ← full duplicate             │
+  │ TOTAL:  209 GB peak disk usage               │
+  └──────────────────────────────────────────────┘
+
+  Hard Link approach (10 splits of a 19 GB index):
+  ┌──────────────────────────────────────────────┐
+  │ Source:  19 GB                               │
+  │ Link 0:   0 GB  ← shared inodes              │
+  │ Link 1:   0 GB  ← shared inodes              │
+  │ ...                                          │
+  │ Link 9:   0 GB  ← shared inodes              │
+  │ TOTAL:   19 GB peak disk usage (before merge) │
+  │                                              │
+  │ After force-merge of all partitions:          │
+  │ TOTAL:  ~38 GB (source + 10 merged partitions)│
+  └──────────────────────────────────────────────┘
+```
+
+### 6.5 Lucene Already Uses Hard Links Internally
+
+Apache Lucene itself uses hard links in several internal operations:
+
+- **`HardlinkCopyDirectoryWrapper`** — Lucene's built-in directory wrapper that
+  uses hard links when copying index files within the same filesystem
+- **Index replication** — Lucene's replication module leverages hard links to
+  efficiently replicate index snapshots to replica nodes
+- **NRT (Near-Real-Time) readers** — Some implementations use hard links to
+  share segment files between the writer and reader directories
+
+This confirms that the Lucene project itself considers hard links a
+**first-class strategy** for working with index files.
+
+---
+
+## 7. Demonstration: Hard-Link-Based Index Splitting
+
+This repository implements a complete benchmark comparing file copy vs. hard link
+approaches for splitting a Lucene 4 index. Here is how the hard link approach
+works in practice.
+
+### 7.1 Creating Hard Links for All Index Files
+
+From `IndexSplitterHardLink.java`:
+
+```java
+/**
+ * Creates hard links for all files in sourceDir into targetDir.
+ * Uses Files.createLink() which creates a new directory entry
+ * pointing to the same inode as the source file.
+ */
+private void hardLinkDirectory(File sourceDir, File targetDir) throws IOException {
+    if (targetDir.exists()) {
+        IndexSplitterCopy.deleteDirectory(targetDir);
+    }
+    targetDir.mkdirs();
+
+    File[] files = sourceDir.listFiles();
+    if (files == null) return;
+
+    for (File srcFile : files) {
+        if (srcFile.isFile()) {
+            Path linkPath = new File(targetDir, srcFile.getName()).toPath();
+            Path existingPath = srcFile.toPath();
+            Files.createLink(linkPath, existingPath);  // ← Hard link, NOT copy
+        }
+    }
+}
+```
+
+**What happens at the OS level for each `Files.createLink()` call:**
+1. The JVM calls the native `link()` system call
+2. The kernel locates the inode for `existingPath`
+3. A new directory entry is created at `linkPath` pointing to the same inode
+4. The inode's `i_nlink` count increments by 1
+5. **Zero bytes of file data are read or written**
+
+### 7.2 The Full Split Workflow
+
+```java
+// Phase 1: Create hard links (near-instant)
+for (int i = 0; i < NUM_SPLITS; i++) {
+    File targetDir = new File(HARDLINK_SPLIT_DIR_PREFIX + i);
+    hardLinkDirectory(sourceDir, targetDir);
+    // Each targetDir now has directory entries pointing to
+    // the SAME inodes as sourceDir's files
+}
+
+// Phase 2: Delete unwanted documents from each partition
+for (int i = 0; i < NUM_SPLITS; i++) {
+    File targetDir = new File(HARDLINK_SPLIT_DIR_PREFIX + i);
+    // Open IndexWriter in APPEND mode on the hard-linked directory
+    IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_4_10_4,
+                                                      new StandardAnalyzer());
+    config.setOpenMode(IndexWriterConfig.OpenMode.APPEND);
+
+    try (FSDirectory dir = FSDirectory.open(targetDir);
+         IndexWriter writer = new IndexWriter(dir, config)) {
+
+        // Delete documents by ID using batched BooleanQuery
+        // Lucene creates .del files — original segments are NOT modified
+        writer.deleteDocuments(booleanQuery);
+        writer.commit();
+
+        // Force-merge reads shared segments, writes NEW private segments
+        // Old hard-linked segment files' link count decreases
+        writer.forceMerge(1);
+        writer.commit();
+    }
+}
+```
+
+### 7.3 Verifying Hard Links with the OS
+
+You can verify that hard links share the same inode using the `stat` command:
+
+```bash
+# Before force-merge: files share the same inode
+$ stat source_index/_0.cfs
+  Inode: 12345678   Links: 11    Size: 2048000000
+
+$ stat hardlink_split/dir0/_0.cfs
+  Inode: 12345678   Links: 11    Size: 2048000000
+#         ^^^^^^^^ Same inode!      ^^ 1 source + 10 links
+
+# After force-merge: dir0 has its own new segment
+$ ls hardlink_split/dir0/
+  _0.cfs     ← still hard-linked (will be cleaned up by Lucene)
+  _3.cfs     ← NEW file, private to dir0 (merged result)
+  segments_2 ← NEW commit point, private to dir0
+```
+
+---
+
+## 8. Benchmark Evidence
+
+The following results from this project's benchmarks demonstrate the hard link
+advantage on real Lucene indexes.
+
+### 8.1 Large Index (10M docs, ~19 GB, 100 fields, 10 splits)
+
+```
+  +-------------------------------------------------+
+  |                 | Copy+Delete | HardLink+Delete  |
+  +-------------------------------------------------+
+  | Total Time      |  1,999,016 ms |  1,361,625 ms  |
+  | Copy/Link Phase |    621,546 ms |        346 ms  |
+  | Delete Phase    |  1,377,470 ms |  1,361,279 ms  |
+  +-------------------------------------------------+
+
+  Copy/Link Phase Speedup: 1,796x faster
+  Overall Speedup:         1.47x faster
+  Time Saved:              ~10.6 minutes
+```
+
+### 8.2 Small Index (100K docs, ~421 MB, 50 fields, 10 splits)
+
+```
+  +-------------------------------------------------+
+  |                 | Copy+Delete | HardLink+Delete  |
+  +-------------------------------------------------+
+  | Total Time      |     48,758 ms |     40,412 ms  |
+  | Copy/Link Phase |      5,703 ms |          3 ms  |
+  | Delete Phase    |     43,055 ms |     40,409 ms  |
+  +-------------------------------------------------+
+
+  Copy/Link Phase Speedup: 1,901x faster
+  Overall Speedup:         1.21x faster
+```
+
+### 8.3 Key Observations
+
+1. **The hard link phase is consistently ~1,800x faster** than file copying —
+   346 ms vs. 621,546 ms for 19 GB
+2. **The delete phase is identical** in both approaches because the same Lucene
+   operations (term deletion + force merge) are performed
+3. **The overall speedup grows with index size** because the copy phase scales
+   linearly with data volume while the link phase scales with file count
+4. **Peak disk usage drops dramatically**: 209 GB (copy) vs. 19 GB (hard link)
+   before force-merge begins
+
+### 8.4 Projected Savings at Scale
+
+| Index Size | Copy Phase  | Link Phase | Copy Phase Savings | Peak Disk Savings |
+|------------|-------------|------------|--------------------|-------------------|
+| 421 MB     | 5.7 sec     | 3 ms       | ~5.7 seconds       | ~4.2 GB           |
+| 19 GB      | 10.4 min    | 346 ms     | ~10.3 minutes      | ~190 GB           |
+| 40 GB      | ~22 min*    | ~700 ms*   | ~22 minutes        | ~400 GB           |
+| 100 GB     | ~55 min*    | ~1.5 sec*  | ~55 minutes        | ~1 TB             |
+
+*Projected values based on linear scaling of observed benchmarks.
+
+---
+
+## 9. Caveats and Constraints
+
+### 9.1 Same-Filesystem Requirement
+
+Hard links can only be created between paths on the **same filesystem/mount point**.
+This is enforced at the kernel level — the `link()` system call returns `EXDEV`
+("cross-device link") if the paths are on different filesystems.
+
+```java
+// This will throw IOException if paths are on different filesystems
+try {
+    Files.createLink(targetPath, sourcePath);
+} catch (IOException e) {
+    // Falls back to file copy if hard link fails
+    Files.copy(sourcePath, targetPath);
+}
+```
+
+### 9.2 No Directory Hard Links
+
+Most POSIX filesystems do not allow hard links to directories (to prevent cycles
+in the filesystem graph). You must iterate over files and link them individually,
+as shown in the `hardLinkDirectory()` method.
+
+### 9.3 Platform-Specific Behavior
+
+| Platform       | Hard Link Support                                    |
+|----------------|------------------------------------------------------|
+| Linux (ext4)   | Full support                                         |
+| Linux (XFS)    | Full support                                         |
+| macOS (APFS)   | Full support                                         |
+| Windows (NTFS) | Supported via `CreateHardLinkW` (requires privileges)|
+| FAT32 / exFAT  | **Not supported** (no inode concept)                 |
+| NFS / network  | Depends on server filesystem                         |
+
+### 9.4 Maximum Link Count
+
+Filesystems impose a maximum number of hard links per inode:
+
+| Filesystem | Max Hard Links per Inode |
+|------------|--------------------------|
+| ext4       | 65,000                   |
+| XFS        | ~4 billion               |
+| NTFS       | 1,024                    |
+| APFS       | No practical limit       |
+
+For index splitting with 10 partitions, this is never a concern.
+
+### 9.5 Backup and Archival Considerations
+
+Some backup tools may not preserve hard link relationships and could create full
+copies instead. Verify that your backup solution handles hard links correctly
+(e.g., `rsync -H` preserves hard links; `tar` preserves them by default).
+
+---
+
+## 10. Summary
+
+### Why Java Hard Links + Lucene Indexes Work So Well
+
+```
+  ┌─────────────────────────────────────────────────────────────┐
+  │                                                             │
+  │   Lucene's Guarantees          Hard Link's Properties       │
+  │   ────────────────────         ──────────────────────       │
+  │   • Segment files are         • Multiple paths share       │
+  │     WRITE-ONCE / IMMUTABLE      the same data blocks       │
+  │                                                             │
+  │   • Modifications create      • Writing through one path   │
+  │     NEW files                   affects all paths           │
+  │                                 (but Lucene never writes    │
+  │   • Deletions use separate      to existing segments)       │
+  │     .del files                                              │
+  │                                                             │
+  │   • Merges read old segments  • When old segments are       │
+  │     and write new ones          unlinked, reference count   │
+  │                                 drops; space is reclaimed   │
+  │                                 only when count reaches 0   │
+  │                                                             │
+  │   ═══════════════════════════════════════════════════════   │
+  │                                                             │
+  │   RESULT: Hard links are 100% safe with Lucene indexes     │
+  │           because the shared files are never modified.      │
+  │                                                             │
+  │   BENEFIT: 1,796x faster than file copy for the link phase │
+  │            Zero additional disk space until merge           │
+  │            Identical final results                          │
+  │                                                             │
+  └─────────────────────────────────────────────────────────────┘
+```
+
+Hard links are not just a performance optimization for Lucene index operations —
+they are the **architecturally correct** approach. Lucene's immutable segment
+design was built with this kind of filesystem-level sharing in mind, which is why
+Lucene itself uses hard links internally (`HardlinkCopyDirectoryWrapper`) for
+index replication and directory operations.
+
+For any operation that requires duplicating a Lucene index directory — whether
+for splitting, snapshotting, replication, or backup — hard links should be the
+**default strategy**, with file copy used only as a fallback when cross-filesystem
+operations are required.
