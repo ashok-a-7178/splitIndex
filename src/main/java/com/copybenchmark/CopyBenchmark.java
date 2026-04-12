@@ -266,11 +266,16 @@ public class CopyBenchmark {
         System.out.println("╠═══════════════════════════════════════════════════════════════╣");
 
         // Speedup
-        double speedup = rsync.copyTimeMs > 0
-                ? (double) rsync.copyTimeMs / Math.max(1, hlink.copyTimeMs)
-                : 0;
-        System.out.printf( "║  %-28s │       %8.2fx faster         ║%n",
-                "Hard-link speedup", speedup);
+        if (hlink.copyTimeMs == 0) {
+            System.out.printf("║  %-28s │       %8s faster          ║%n",
+                    "Hard-link speedup", "instant");
+        } else {
+            double speedup = rsync.copyTimeMs > 0
+                    ? (double) rsync.copyTimeMs / hlink.copyTimeMs
+                    : 0;
+            System.out.printf("║  %-28s │       %8.2fx faster         ║%n",
+                    "Hard-link speedup", speedup);
+        }
         System.out.println("╚═══════════════════════════════════════════════════════════════╝");
         System.out.println();
     }

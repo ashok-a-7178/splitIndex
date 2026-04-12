@@ -91,7 +91,7 @@ public class DataAvailabilityValidator {
             System.out.printf("  OK  : %d / %d random term queries returned results.%n", hits, queries);
 
             if (hits < queries) {
-                System.out.println("  WARN: some queries returned no results – possible partial copy.");
+                System.out.println("  WARN: some queries returned no results - possible partial copy.");
             }
 
             System.out.println("  PASS: data availability validated.");

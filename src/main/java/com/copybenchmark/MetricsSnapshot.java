@@ -8,10 +8,10 @@ public final class MetricsSnapshot {
     /** Wall-clock time when the sample was taken. */
     public final long timestampMs;
 
-    /** JVM process CPU load (0.0 – 1.0). */
+    /** JVM process CPU load (0.0 - 1.0). */
     public final double processCpuLoad;
 
-    /** Whole-system CPU load (0.0 – 1.0). */
+    /** Whole-system CPU load (0.0 - 1.0). */
     public final double systemCpuLoad;
 
     /** Heap memory currently in use (bytes). */

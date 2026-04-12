@@ -17,6 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * (CPU load, heap memory, disk IO bytes) and stores them as
  * {@link MetricsSnapshot} instances for later analysis.
  *
+ * <p><strong>Note:</strong> This class requires a Sun/Oracle/OpenJDK JVM
+ * because it casts to {@code com.sun.management.OperatingSystemMXBean} to
+ * obtain process-level CPU load.  It will not work on non-HotSpot JVMs.</p>
+ *
  * <p>Usage:
  * <pre>{@code
  *   SystemMetricsCollector collector = new SystemMetricsCollector("source");
@@ -125,23 +129,22 @@ public class SystemMetricsCollector {
         long readBytes = 0;
         long writeBytes = 0;
         if (procIo.exists()) {
-            BufferedReader br = null;
             try {
-                br = new BufferedReader(new FileReader(procIo));
-                String line;
-                while ((line = br.readLine()) != null) {
-                    if (line.startsWith("read_bytes:")) {
-                        readBytes = Long.parseLong(line.split("\\s+")[1]);
-                    } else if (line.startsWith("write_bytes:")) {
-                        writeBytes = Long.parseLong(line.split("\\s+")[1]);
+                BufferedReader br = new BufferedReader(new FileReader(procIo));
+                try {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        if (line.startsWith("read_bytes:")) {
+                            readBytes = Long.parseLong(line.split("\\s+")[1]);
+                        } else if (line.startsWith("write_bytes:")) {
+                            writeBytes = Long.parseLong(line.split("\\s+")[1]);
+                        }
                     }
+                } finally {
+                    br.close();
                 }
             } catch (IOException ignored) {
                 // /proc/self/io may not be available on all platforms
-            } finally {
-                if (br != null) {
-                    try { br.close(); } catch (IOException ignored) { }
-                }
             }
         }
         return new long[]{readBytes, writeBytes};
