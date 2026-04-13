@@ -46,6 +46,9 @@ public final class SplitConfig {
     /** Directory prefix for hard-link-based split approach. */
     public static final String HARDLINK_SPLIT_DIR_PREFIX = BASE_DIR + File.separator + "hardlink_split" + File.separator + "dir";
 
+    /** Directory prefix for rsync-based split approach. */
+    public static final String RSYNC_SPLIT_DIR_PREFIX = BASE_DIR + File.separator + "rsync_split" + File.separator + "dir";
+
     // ---- Lucene settings ----
 
     /** RAM buffer size for IndexWriter (in MB). */
