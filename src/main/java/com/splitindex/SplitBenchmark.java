@@ -35,7 +35,7 @@ import java.io.IOException;
  */
 public class SplitBenchmark {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         System.out.println("============================================================");
         System.out.println("  Lucene 4 Index Splitting Benchmark");
         System.out.println("============================================================");
@@ -58,6 +58,15 @@ public class SplitBenchmark {
                 break;
             case "hardlink":
                 runHardLinkSplit();
+                break;
+            case "rsync":
+                runRsyncSplit();
+                break;
+            case "rsync-vs-hardlink":
+                RsyncVsHardLinkBenchmark.run();
+                break;
+            case "smoketest":
+                new ConcurrentCopySmokeTest().run();
                 break;
             case "clean":
                 runClean();
@@ -104,6 +113,11 @@ public class SplitBenchmark {
         return new IndexSplitterHardLink().split();
     }
 
+    private static long[] runRsyncSplit() throws IOException {
+        System.out.println("\n>>> STEP: Run Rsync-Based Split");
+        return new IndexSplitterRsync().split();
+    }
+
     private static void runClean() {
         System.out.println("\n>>> STEP: Clean All Benchmark Data");
         File baseDir = new File(SplitConfig.BASE_DIR);
@@ -117,10 +131,16 @@ public class SplitBenchmark {
 
     private static void cleanSplitOutputs(String type) {
         String prefix;
-        if ("copy".equals(type)) {
-            prefix = SplitConfig.COPY_SPLIT_DIR_PREFIX;
-        } else {
-            prefix = SplitConfig.HARDLINK_SPLIT_DIR_PREFIX;
+        switch (type) {
+            case "copy":
+                prefix = SplitConfig.COPY_SPLIT_DIR_PREFIX;
+                break;
+            case "rsync":
+                prefix = SplitConfig.RSYNC_SPLIT_DIR_PREFIX;
+                break;
+            default:
+                prefix = SplitConfig.HARDLINK_SPLIT_DIR_PREFIX;
+                break;
         }
         for (int i = 0; i < SplitConfig.NUM_SPLITS; i++) {
             File dir = new File(prefix + i);
