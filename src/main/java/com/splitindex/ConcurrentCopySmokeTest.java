@@ -305,7 +305,8 @@ public class ConcurrentCopySmokeTest {
             if (Files.exists(srcPath)) {
                 Files.createLink(snapPath, srcPath);
             } else {
-                System.out.println("[HardLink] WARNING: File no longer exists (deleted by merge?): " + fileName);
+                System.out.println("[HardLink] WARNING: File not found on disk: " + fileName
+                        + " (may have been removed by a concurrent merge)");
             }
         }
 
