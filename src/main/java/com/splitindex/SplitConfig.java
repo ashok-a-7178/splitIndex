@@ -51,7 +51,8 @@ public final class SplitConfig {
 
     /** Base directory for all benchmark data. */
     public static final String BASE_DIR =
-            System.getProperty("splitindex.basedir", "/Users/ashok-7178/AdminOP/luceneIndex");
+            System.getProperty("splitindex.basedir",
+                    System.getProperty("user.home") + File.separator + "luceneIndex");
 
     /** Source index directory. */
     public static final String SOURCE_INDEX_DIR = BASE_DIR + File.separator + "source_index";

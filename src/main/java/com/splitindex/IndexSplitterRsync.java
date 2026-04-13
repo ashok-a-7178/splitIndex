@@ -181,11 +181,12 @@ public class IndexSplitterRsync {
         try {
             Process process = pb.start();
 
-            // Consume output to prevent blocking
+            // Drain stdout to prevent the rsync process from blocking
+            // when the OS pipe buffer fills up
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 while (reader.readLine() != null) {
-                    // discard output
+                    // output discarded; rsync produces none in non-verbose mode
                 }
             }
 
