@@ -5,9 +5,19 @@ import java.io.File;
 /**
  * Configuration constants for the Lucene index splitting benchmark.
  *
- * <p>Adjust these values based on your environment and testing needs.
- * For full-scale benchmarking with 40M records and 40GB index, use the
- * FULL_SCALE constants. For quick smoke tests, use the default (smaller) values.</p>
+ * <p>All settings can be overridden via system properties for quick smoke tests.
+ * For example:
+ * <pre>
+ *   java -Dsplitindex.basedir=/tmp/bench \
+ *        -Dsplitindex.totalDocs=1000 \
+ *        -Dsplitindex.numUniqueIds=100 \
+ *        -Dsplitindex.numFields=10 \
+ *        -Dsplitindex.numSplits=3 \
+ *        -cp target/splitIndex-1.0-SNAPSHOT.jar com.splitindex.SplitBenchmark rsync-vs-hardlink
+ * </pre>
+ *
+ * <p>For full-scale benchmarking with 40M records and 40GB index, use the
+ * defaults or set explicit large values.</p>
  */
 public final class SplitConfig {
 
@@ -18,24 +28,30 @@ public final class SplitConfig {
     // ---- Index generation settings ----
 
     /** Number of fields per document (including the ID field). */
-    public static final int NUM_FIELDS = 100;
+    public static final int NUM_FIELDS =
+            Integer.getInteger("splitindex.numFields", 100);
 
     /** Number of unique ID values distributed across documents. */
-    public static final int NUM_UNIQUE_IDS = 10_000;
+    public static final int NUM_UNIQUE_IDS =
+            Integer.getInteger("splitindex.numUniqueIds", 10_000);
 
     /** Total number of documents to generate. */
-    public static final int TOTAL_DOCS = 10_000_000;
+    public static final int TOTAL_DOCS =
+            Integer.getInteger("splitindex.totalDocs", 10_000_000);
 
     /** Target document size in bytes (approximately). */
-    public static final int TARGET_DOC_SIZE_BYTES = 1024;
+    public static final int TARGET_DOC_SIZE_BYTES =
+            Integer.getInteger("splitindex.targetDocSizeBytes", 1024);
 
     /** Number of sub-indices to split into. */
-    public static final int NUM_SPLITS = 10;
+    public static final int NUM_SPLITS =
+            Integer.getInteger("splitindex.numSplits", 10);
 
     // ---- Directory paths ----
 
     /** Base directory for all benchmark data. */
-    public static final String BASE_DIR = "/Users/ashok-7178/AdminOP/luceneIndex";
+    public static final String BASE_DIR =
+            System.getProperty("splitindex.basedir", "/Users/ashok-7178/AdminOP/luceneIndex");
 
     /** Source index directory. */
     public static final String SOURCE_INDEX_DIR = BASE_DIR + File.separator + "source_index";
@@ -55,7 +71,8 @@ public final class SplitConfig {
     public static final double RAM_BUFFER_SIZE_MB = 256.0;
 
     /** Batch size for document indexing. */
-    public static final int INDEX_BATCH_SIZE = 10_000;
+    public static final int INDEX_BATCH_SIZE =
+            Integer.getInteger("splitindex.indexBatchSize", 10_000);
 
     /** Number of producer threads for parallel document creation. */
     public static final int NUM_PRODUCER_THREADS = Runtime.getRuntime().availableProcessors();
