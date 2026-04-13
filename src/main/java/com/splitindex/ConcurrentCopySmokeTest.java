@@ -38,10 +38,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * to a remote machine while the source index is being actively modified
  * (new document additions, updates, and deletes creating new segments).
  *
- * <p>This tests two approaches for safely copying immutable Lucene segment files
+ * <p>This tests three approaches for safely copying immutable Lucene segment files
  * while the index is live:</p>
  *
- * <h3>Approach 1: Hard-Link Snapshot</h3>
+ * <h3>Approach 1: Hard-Link Snapshot (SegmentInfos-based)</h3>
  * <ol>
  *   <li>Create a snapshot subdirectory on the source</li>
  *   <li>Read the current {@code segments_N} commit point to identify active segment files</li>
@@ -52,7 +52,21 @@ import java.util.concurrent.atomic.AtomicInteger;
  *       Lucene segment files are immutable (write-once, never modified)</li>
  * </ol>
  *
- * <h3>Approach 2: Rsync</h3>
+ * <h3>Approach 2: Hard-Link Live Capture</h3>
+ * <ol>
+ *   <li>Hard-link ALL files from the live source index directory directly to the
+ *       destination — no SegmentInfos reading, no snapshot subdirectory</li>
+ *   <li>This captures whatever files exist in the directory at that moment,
+ *       including files from the latest commit point as well as any new segments
+ *       being written concurrently</li>
+ *   <li>Because segment files are immutable, the hard-linked copies remain valid
+ *       even if merges later delete the originals from the source</li>
+ *   <li>The destination may contain extra segment files not referenced by the
+ *       {@code segments_N} commit point, but Lucene ignores unreferenced files
+ *       when opening the index</li>
+ * </ol>
+ *
+ * <h3>Approach 3: Rsync</h3>
  * <ol>
  *   <li>Use {@code rsync -a --delete} to copy from source to remote destination</li>
  *   <li>Rsync handles file-level changes by transferring only modified/new files</li>
@@ -95,13 +109,19 @@ public class ConcurrentCopySmokeTest {
     /** Number of fields per document. */
     private static final int DOC_FIELDS = 5;
 
-    /** Target document size in bytes (~1KB per document). */
-    private static final int TARGET_DOC_SIZE_BYTES = 1024;
+    /**
+     * Target document size in bytes. Set to ~8KB per document so that
+     * 100k docs produce a ~400MB on-disk index (Lucene compresses stored
+     * fields, so raw content must be large enough to hit the target after
+     * compression).
+     */
+    private static final int TARGET_DOC_SIZE_BYTES = 8_192;
 
     private final String baseDir;
     private final String sourceDir;
     private final String snapshotDir;
     private final String hardlinkDestDir;
+    private final String hardlinkLiveDestDir;
     private final String rsyncDestDir;
 
     public ConcurrentCopySmokeTest() {
@@ -109,6 +129,7 @@ public class ConcurrentCopySmokeTest {
         this.sourceDir = baseDir + File.separator + "source_index";
         this.snapshotDir = baseDir + File.separator + "snapshot";
         this.hardlinkDestDir = baseDir + File.separator + "dest_hardlink";
+        this.hardlinkLiveDestDir = baseDir + File.separator + "dest_hardlink_live";
         this.rsyncDestDir = baseDir + File.separator + "dest_rsync";
     }
 
@@ -121,12 +142,13 @@ public class ConcurrentCopySmokeTest {
         System.out.println("  Simulates source→remote index replication with live writes");
         System.out.println("================================================================");
         System.out.println("  Initial docs:        " + INITIAL_DOCS);
-        System.out.println("  Doc size:            ~" + TARGET_DOC_SIZE_BYTES + " bytes (~1KB)");
-        System.out.println("  Expected index size: ~" + (INITIAL_DOCS * TARGET_DOC_SIZE_BYTES / 1024 / 1024) + " MB");
+        System.out.println("  Doc size:            ~" + TARGET_DOC_SIZE_BYTES + " bytes (~" + (TARGET_DOC_SIZE_BYTES / 1024) + "KB)");
+        System.out.println("  Expected index size: ~400 MB (target)");
         System.out.println("  Concurrent ops:      " + CONCURRENT_OPS);
         System.out.println("  Source dir:          " + sourceDir);
         System.out.println("  Snapshot dir:        " + snapshotDir);
         System.out.println("  HardLink dest dir:   " + hardlinkDestDir);
+        System.out.println("  HL-Live dest dir:    " + hardlinkLiveDestDir);
         System.out.println("  Rsync dest dir:      " + rsyncDestDir);
         System.out.println("================================================================\n");
 
@@ -145,16 +167,20 @@ public class ConcurrentCopySmokeTest {
         System.out.println("\n>>> STEP 3: Hard-Link Snapshot approach (with concurrent writes)");
         long hlTime = testHardLinkSnapshot();
 
-        // Step 4: Test Rsync approach with concurrent writes
-        System.out.println("\n>>> STEP 4: Rsync approach (with concurrent writes)");
+        // Step 4: Test Hard-Link Live Capture approach with concurrent writes
+        System.out.println("\n>>> STEP 4: Hard-Link Live Capture approach (with concurrent writes)");
+        long hlLiveTime = testHardLinkLiveCapture();
+
+        // Step 5: Test Rsync approach with concurrent writes
+        System.out.println("\n>>> STEP 5: Rsync approach (with concurrent writes)");
         long rsyncTime = testRsync();
 
-        // Step 5: List segment files after all concurrent writes
-        System.out.println("\n>>> STEP 5: Source index segment files (after all concurrent writes)");
+        // Step 6: List segment files after all concurrent writes
+        System.out.println("\n>>> STEP 6: Source index segment files (after all concurrent writes)");
         listSegmentFiles(new File(sourceDir));
 
-        // Step 6: Print comparison
-        printResults(hlTime, rsyncTime);
+        // Step 7: Print comparison
+        printResults(hlTime, hlLiveTime, rsyncTime);
 
         // Cleanup
         System.out.println("\n[SmokeTest] Cleaning up...");
@@ -333,7 +359,134 @@ public class ConcurrentCopySmokeTest {
     }
 
     // =========================================================================
-    //  Step 4: Rsync approach with concurrent writes
+    //  Step 4: Hard-Link Live Capture with concurrent writes
+    // =========================================================================
+
+    /**
+     * Tests the hard-link live capture approach:
+     * <ol>
+     *   <li>Start a background writer doing adds/updates/deletes on the source</li>
+     *   <li>Hard-link ALL files from the live source directory directly to the
+     *       destination (no SegmentInfos reading, no snapshot subdir)</li>
+     *   <li>Stop the background writer</li>
+     *   <li>Verify the destination index is readable and consistent</li>
+     * </ol>
+     *
+     * <p>This differs from the snapshot approach: instead of consulting SegmentInfos
+     * to find only the active segment files, we hard-link every file in the source
+     * directory. The destination may contain unreferenced segment files, but Lucene
+     * ignores those when opening the index — it only reads files listed in the
+     * {@code segments_N} commit point.</p>
+     */
+    private long testHardLinkLiveCapture() throws IOException, InterruptedException {
+        long start = System.currentTimeMillis();
+
+        // Start concurrent writer
+        AtomicBoolean stopWriter = new AtomicBoolean(false);
+        AtomicInteger opsCompleted = new AtomicInteger(0);
+        CountDownLatch writerStarted = new CountDownLatch(1);
+
+        Thread writerThread = new Thread(() -> {
+            try {
+                doConcurrentWrites(stopWriter, opsCompleted, writerStarted);
+            } catch (Exception e) {
+                System.err.println("[SmokeTest] Writer thread error: " + e.getMessage());
+            }
+        }, "concurrent-writer-hl-live");
+        writerThread.setDaemon(true);
+        writerThread.start();
+
+        // Wait for writer to start
+        writerStarted.await();
+        // Let some writes happen first
+        Thread.sleep(100);
+
+        System.out.println("[HL-Live] Hard-linking ALL files from live source dir...");
+        System.out.println("[HL-Live] Concurrent writer is active ("
+                + opsCompleted.get() + " ops so far)");
+
+        // Hard-link all files from live source directly to destination
+        File destDir = new File(hardlinkLiveDestDir);
+        createHardLinkLiveCapture(new File(sourceDir), destDir);
+
+        System.out.println("[HL-Live] Live capture complete. Listing destination files:");
+        listSegmentFiles(destDir);
+
+        // Let more writes happen to show source diverges
+        Thread.sleep(200);
+
+        // Stop concurrent writer
+        stopWriter.set(true);
+        writerThread.join(5000);
+
+        long elapsed = System.currentTimeMillis() - start;
+
+        System.out.println("[HL-Live] Concurrent writer completed "
+                + opsCompleted.get() + " operations");
+
+        // Verify destination index
+        System.out.println("[HL-Live] Verifying destination index...");
+        verifyIndex(destDir, "HL-Live");
+
+        System.out.println("[HL-Live] Total time: " + elapsed + " ms");
+        return elapsed;
+    }
+
+    /**
+     * Creates a live capture of the source index by hard-linking ALL files
+     * in the source directory to the destination directory. Unlike
+     * {@link #createHardLinkSnapshot(File, File)}, this does NOT read
+     * SegmentInfos — it simply links every file present in the directory.
+     *
+     * <p>This may include:</p>
+     * <ul>
+     *   <li>Active segment files from the latest commit point</li>
+     *   <li>Segment files from ongoing merges (not yet referenced by a commit)</li>
+     *   <li>Deletion files (.del) from concurrent updates/deletes</li>
+     *   <li>The write.lock file</li>
+     * </ul>
+     *
+     * <p>Lucene ignores unreferenced files when opening, so the destination
+     * index is readable as long as the {@code segments_N} and all files it
+     * references are present.</p>
+     */
+    private void createHardLinkLiveCapture(File srcDir, File destDir) throws IOException {
+        if (destDir.exists()) {
+            IndexSplitterCopy.deleteDirectory(destDir);
+        }
+        destDir.mkdirs();
+
+        File[] files = srcDir.listFiles();
+        if (files == null) {
+            System.out.println("[HL-Live] WARNING: Source directory is empty or not readable");
+            return;
+        }
+
+        int linked = 0;
+        int skipped = 0;
+        for (File srcFile : files) {
+            if (srcFile.isFile()) {
+                Path srcPath = srcFile.toPath();
+                Path destPath = new File(destDir, srcFile.getName()).toPath();
+                try {
+                    Files.createLink(destPath, srcPath);
+                    linked++;
+                } catch (IOException e) {
+                    // File may have been deleted by a concurrent merge between
+                    // listFiles() and createLink(); this is expected and safe
+                    skipped++;
+                    System.out.println("[HL-Live] Skipped (concurrent delete?): "
+                            + srcFile.getName() + " — " + e.getMessage());
+                }
+            }
+        }
+
+        System.out.println("[HL-Live] Hard-linked " + linked + " files"
+                + (skipped > 0 ? " (skipped " + skipped + " due to concurrent changes)" : ""));
+    }
+
+    // =========================================================================
+    //  Step 5: Rsync approach with concurrent writes
     // =========================================================================
 
     /**
@@ -442,8 +595,15 @@ public class ConcurrentCopySmokeTest {
                 }
             }
             int exitCode = process.waitFor();
-            if (exitCode != 0) {
+            // Exit code 24 = "Partial transfer due to vanished source files"
+            // This is expected when concurrent merges delete segment files
+            // between rsync's file-list scan and actual transfer.
+            if (exitCode != 0 && exitCode != 24) {
                 throw new IOException("rsync failed with exit code " + exitCode);
+            }
+            if (exitCode == 24) {
+                System.out.println("[Rsync] Note: exit code 24 — some source files "
+                        + "vanished during transfer (expected with concurrent writes)");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -566,9 +726,11 @@ public class ConcurrentCopySmokeTest {
     // =========================================================================
 
     /**
-     * Creates a single Lucene document of approximately {@link #TARGET_DOC_SIZE_BYTES}
-     * (1KB). The content field is padded with dictionary-style text to reach the
-     * target size.
+     * Creates a single Lucene document of approximately {@link #TARGET_DOC_SIZE_BYTES}.
+     * The content field is filled with pseudo-random text drawn from a large
+     * vocabulary, producing content that does not compress as aggressively as
+     * simple repeating patterns. This ensures the on-disk index reaches the
+     * target size (~400 MB for 100k docs).
      */
     private Document createDocument(int docIndex) {
         Document doc = new Document();
@@ -578,20 +740,17 @@ public class ConcurrentCopySmokeTest {
         doc.add(new StringField("status", "active", Field.Store.YES));
         doc.add(new IntField("version", 1, Field.Store.YES));
 
-        // Build content field to fill up to ~1KB total stored size.
+        // Build content field to fill up to target size.
         // Fixed overhead: docId (~10 bytes) + sequence (4) + status (6) + version (4) ≈ 24 bytes
         int contentTarget = Math.max(50, TARGET_DOC_SIZE_BYTES - 24);
-        StringBuilder sb = new StringBuilder(contentTarget);
+        StringBuilder sb = new StringBuilder(contentTarget + 20);
         sb.append("document number ").append(docIndex).append(' ');
-        // Pad with repeating word patterns to reach target size
-        String[] words = {"lucene", "index", "segment", "immutable", "replication",
-                "hardlink", "rsync", "snapshot", "commit", "merge", "field",
-                "search", "query", "term", "filter", "analyzer", "tokenizer",
-                "benchmark", "performance", "throughput"};
-        int wordIdx = docIndex % words.length;
+
+        // Use a per-document seeded Random so content varies across documents,
+        // reducing Lucene's stored-field compression ratio.
+        Random rng = new Random(docIndex * 31L + 7);
         while (sb.length() < contentTarget) {
-            sb.append(words[wordIdx % words.length]).append(' ');
-            wordIdx++;
+            sb.append(VOCABULARY[rng.nextInt(VOCABULARY.length)]).append(' ');
         }
         // Trim to exact target
         if (sb.length() > contentTarget) {
@@ -601,6 +760,41 @@ public class ConcurrentCopySmokeTest {
 
         return doc;
     }
+
+    /**
+     * A large vocabulary of distinct words used to generate document content.
+     * Using many distinct words reduces the effectiveness of Lucene's stored-field
+     * compression (LZ4), ensuring the on-disk index reaches the target size.
+     */
+    private static final String[] VOCABULARY = {
+        "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel",
+        "india", "juliet", "kilo", "lima", "mike", "november", "oscar", "papa",
+        "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiskey", "xray",
+        "yankee", "zulu", "abstract", "boolean", "class", "double", "extends",
+        "final", "generic", "hashmap", "integer", "javadoc", "keyword", "lambda",
+        "module", "native", "object", "package", "qualifier", "return", "static",
+        "thread", "utility", "volatile", "wrapper", "xerces", "yield", "zenith",
+        "algorithm", "benchmark", "compiler", "database", "endpoint", "framework",
+        "gateway", "hibernate", "iterator", "jackson", "kubernetes", "lifecycle",
+        "middleware", "namespace", "orchestrator", "pipeline", "queryable", "resolver",
+        "scheduler", "transformer", "upstream", "validator", "webservice", "xmlparser",
+        "yesterday", "zookeeper", "analytics", "bootstrap", "container", "deployment",
+        "elasticsearch", "federation", "graphql", "horizontal", "ingestion", "jmeter",
+        "kafkaesque", "loadbalancer", "microservice", "notification", "observability",
+        "prometheus", "quarantine", "replication", "serverless", "telemetry",
+        "unsharded", "vectorized", "workload", "xfermode", "yamlconfig", "zeppelin",
+        "accumulator", "bytebuffer", "checkpoint", "dispatcher", "encryption",
+        "filesystem", "governance", "heartbeat", "idempotent", "journaling",
+        "keystore", "linearizable", "monotonic", "nondeterministic", "optimistic",
+        "partitioner", "quorum", "raftprotocol", "serialization", "timestamp",
+        "uncommitted", "versionable", "writeahead", "xenomorph", "yieldpoint",
+        "zerocopy", "annotation", "backtrace", "coroutine", "deserialize",
+        "enumerable", "finalizer", "generational", "heapdump", "interleaved",
+        "joinpoint", "kernelspace", "lockfree", "memtable", "nullsafe",
+        "overloaded", "polymorphic", "quotient", "recursive", "semaphore",
+        "tombstone", "underflow", "viewport", "watermark", "xorshift"
+    };
+
 
     private void listSegmentFiles(File indexDir) {
         File[] files = indexDir.listFiles();
@@ -656,20 +850,20 @@ public class ConcurrentCopySmokeTest {
     //  Results
     // =========================================================================
 
-    private void printResults(long hlTime, long rsyncTime) {
+    private void printResults(long hlTime, long hlLiveTime, long rsyncTime) {
         System.out.println("\n================================================================");
         System.out.println("  SMOKE TEST RESULTS");
         System.out.println("================================================================");
         System.out.println();
-        System.out.println("  Test scenario: Copy Lucene index from source to remote");
+        System.out.println("  Test scenario: Copy ~400 MB Lucene index from source to remote");
         System.out.println("                 while concurrent indexing creates new segments");
         System.out.println();
-        System.out.println("  +----------------------------------------------------+");
-        System.out.println("  |                    | HardLink Snap  | Rsync          |");
-        System.out.println("  +----------------------------------------------------+");
-        System.out.printf("  | Total Time         | %,10d ms   | %,10d ms   |%n",
-                hlTime, rsyncTime);
-        System.out.println("  +----------------------------------------------------+");
+        System.out.println("  +-----------------------------------------------------------------------+");
+        System.out.println("  |                    | HL Snapshot     | HL Live        | Rsync          |");
+        System.out.println("  +-----------------------------------------------------------------------+");
+        System.out.printf("  | Total Time         | %,10d ms   | %,10d ms   | %,10d ms   |%n",
+                hlTime, hlLiveTime, rsyncTime);
+        System.out.println("  +-----------------------------------------------------------------------+");
         System.out.println();
         System.out.println("  Key observations:");
         System.out.println("  ─────────────────────────────────────────────────────");
@@ -680,6 +874,13 @@ public class ConcurrentCopySmokeTest {
         System.out.println("    - Copy from snapshot dir to remote is safe (no races)");
         System.out.println("    - Requires same filesystem for the snapshot step");
         System.out.println();
+        System.out.println("  HardLink Live Capture approach:");
+        System.out.println("    - Hard-links ALL files from the live source directory");
+        System.out.println("    - No SegmentInfos reading — faster, simpler");
+        System.out.println("    - May include unreferenced segment files (Lucene ignores them)");
+        System.out.println("    - Tolerates concurrent merges via IOException handling");
+        System.out.println("    - Destination is readable as long as segments_N + its files exist");
+        System.out.println();
         System.out.println("  Rsync approach:");
         System.out.println("    - Copies all files from source to destination");
         System.out.println("    - Multiple passes needed for consistency during live writes");
@@ -687,7 +888,7 @@ public class ConcurrentCopySmokeTest {
         System.out.println("    - Only transfers changed bytes (efficient for immutable files)");
         System.out.println("    - Final pass after writer stops ensures full consistency");
         System.out.println();
-        System.out.println("  Both approaches rely on Lucene segment immutability:");
+        System.out.println("  All approaches rely on Lucene segment immutability:");
         System.out.println("    - Segment files are write-once, never modified in place");
         System.out.println("    - New indexing creates NEW segment files");
         System.out.println("    - Merges create NEW combined segments, old ones are deleted");
