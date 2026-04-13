@@ -83,17 +83,20 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class ConcurrentCopySmokeTest {
 
-    /** Number of documents in the initial index. */
-    private static final int INITIAL_DOCS = 500;
+    /** Number of documents in the initial index (100k for realistic smoke test). */
+    private static final int INITIAL_DOCS = 100_000;
 
     /** Number of concurrent write operations to perform during copy. */
-    private static final int CONCURRENT_OPS = 200;
+    private static final int CONCURRENT_OPS = 1_000;
 
     /** Delay in ms between concurrent operations to simulate realistic writes. */
-    private static final int OP_DELAY_MS = 10;
+    private static final int OP_DELAY_MS = 5;
 
     /** Number of fields per document. */
     private static final int DOC_FIELDS = 5;
+
+    /** Target document size in bytes (~1KB per document). */
+    private static final int TARGET_DOC_SIZE_BYTES = 1024;
 
     private final String baseDir;
     private final String sourceDir;
@@ -118,6 +121,8 @@ public class ConcurrentCopySmokeTest {
         System.out.println("  Simulates source→remote index replication with live writes");
         System.out.println("================================================================");
         System.out.println("  Initial docs:        " + INITIAL_DOCS);
+        System.out.println("  Doc size:            ~" + TARGET_DOC_SIZE_BYTES + " bytes (~1KB)");
+        System.out.println("  Expected index size: ~" + (INITIAL_DOCS * TARGET_DOC_SIZE_BYTES / 1024 / 1024) + " MB");
         System.out.println("  Concurrent ops:      " + CONCURRENT_OPS);
         System.out.println("  Source dir:          " + sourceDir);
         System.out.println("  Snapshot dir:        " + snapshotDir);
@@ -166,7 +171,7 @@ public class ConcurrentCopySmokeTest {
         dir.mkdirs();
 
         IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_4_10_4, new StandardAnalyzer());
-        config.setRAMBufferSizeMB(16.0);
+        config.setRAMBufferSizeMB(64.0);
         config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
 
         try (FSDirectory fsDir = FSDirectory.open(dir);
@@ -174,6 +179,9 @@ public class ConcurrentCopySmokeTest {
 
             for (int i = 0; i < INITIAL_DOCS; i++) {
                 writer.addDocument(createDocument(i));
+                if (i > 0 && i % 10_000 == 0) {
+                    System.out.println("[SmokeTest] Indexed " + i + " / " + INITIAL_DOCS + " docs");
+                }
             }
             writer.commit();
             System.out.println("[SmokeTest] Generated " + INITIAL_DOCS + " docs, committing...");
@@ -477,7 +485,7 @@ public class ConcurrentCopySmokeTest {
         Random rng = new Random(42);
 
         IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_4_10_4, new StandardAnalyzer());
-        config.setRAMBufferSizeMB(8.0);
+        config.setRAMBufferSizeMB(32.0);
         config.setOpenMode(IndexWriterConfig.OpenMode.APPEND);
         // Do NOT forceMerge — we want multiple segments to appear
 
@@ -507,7 +515,7 @@ public class ConcurrentCopySmokeTest {
                 opsCompleted.incrementAndGet();
 
                 // Commit periodically to create new segment files on disk
-                if (opsCompleted.get() % 20 == 0) {
+                if (opsCompleted.get() % 100 == 0) {
                     writer.commit();
                     System.out.println("[Writer] Committed after " + opsCompleted.get()
                             + " ops (new segments created on disk)");
@@ -557,15 +565,40 @@ public class ConcurrentCopySmokeTest {
     //  Helpers
     // =========================================================================
 
+    /**
+     * Creates a single Lucene document of approximately {@link #TARGET_DOC_SIZE_BYTES}
+     * (1KB). The content field is padded with dictionary-style text to reach the
+     * target size.
+     */
     private Document createDocument(int docIndex) {
         Document doc = new Document();
-        doc.add(new StringField("docId", "doc_" + docIndex, Field.Store.YES));
+        String docIdValue = "doc_" + docIndex;
+        doc.add(new StringField("docId", docIdValue, Field.Store.YES));
         doc.add(new IntField("sequence", docIndex, Field.Store.YES));
-        doc.add(new TextField("content",
-                "document number " + docIndex + " with some sample text for testing",
-                Field.Store.YES));
         doc.add(new StringField("status", "active", Field.Store.YES));
         doc.add(new IntField("version", 1, Field.Store.YES));
+
+        // Build content field to fill up to ~1KB total stored size.
+        // Fixed overhead: docId (~10 bytes) + sequence (4) + status (6) + version (4) ≈ 24 bytes
+        int contentTarget = Math.max(50, TARGET_DOC_SIZE_BYTES - 24);
+        StringBuilder sb = new StringBuilder(contentTarget);
+        sb.append("document number ").append(docIndex).append(' ');
+        // Pad with repeating word patterns to reach target size
+        String[] words = {"lucene", "index", "segment", "immutable", "replication",
+                "hardlink", "rsync", "snapshot", "commit", "merge", "field",
+                "search", "query", "term", "filter", "analyzer", "tokenizer",
+                "benchmark", "performance", "throughput"};
+        int wordIdx = docIndex % words.length;
+        while (sb.length() < contentTarget) {
+            sb.append(words[wordIdx % words.length]).append(' ');
+            wordIdx++;
+        }
+        // Trim to exact target
+        if (sb.length() > contentTarget) {
+            sb.setLength(contentTarget);
+        }
+        doc.add(new TextField("content", sb.toString(), Field.Store.YES));
+
         return doc;
     }
 
