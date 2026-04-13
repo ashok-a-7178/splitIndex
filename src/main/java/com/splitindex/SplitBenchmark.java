@@ -35,7 +35,7 @@ import java.io.IOException;
  */
 public class SplitBenchmark {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         System.out.println("============================================================");
         System.out.println("  Lucene 4 Index Splitting Benchmark");
         System.out.println("============================================================");
@@ -64,6 +64,9 @@ public class SplitBenchmark {
                 break;
             case "rsync-vs-hardlink":
                 RsyncVsHardLinkBenchmark.run();
+                break;
+            case "smoketest":
+                new ConcurrentCopySmokeTest().run();
                 break;
             case "clean":
                 runClean();
