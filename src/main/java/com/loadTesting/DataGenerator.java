@@ -39,7 +39,8 @@ import java.util.Set;
  * and newimplone-commonfields-type.xml (common fields + FieldGroup fields),
  * and values are filled from dictionary.txt.
  *
- * Usage: Run main(), then enter total documents and MODULE_ID when prompted.
+ * Usage: Run main(), then enter total documents, MODULE_ID, fields per document,
+ * and target document size in bytes when prompted.
  */
 public class DataGenerator {
 
@@ -91,19 +92,30 @@ public class DataGenerator {
 
         System.out.print("Enter MODULE_ID (e.g., 1, 2, 3, 4, 5): ");
         String moduleId = scanner.next();
+
+        System.out.print("Enter maximum number of fields per document (0 = use all fields from XML): ");
+        int fieldsPerDocument = scanner.nextInt();
+
+        System.out.print("Enter target data size per document in bytes (0 = no size padding, e.g., 3072 for 3KB): ");
+        int documentSizeBytes = scanner.nextInt();
         // Not closing scanner to avoid closing System.in
 
-        List<String> fields = generator.getFieldsForModule(moduleId);
+        List<String> allFields = generator.getFieldsForModule(moduleId);
+        int effectiveFields = (fieldsPerDocument <= 0 || fieldsPerDocument > allFields.size())
+                ? allFields.size() : fieldsPerDocument;
+
         System.out.println("\n--- Configuration ---");
         System.out.println("Total documents  : " + totalDocuments);
         System.out.println("MODULE_ID        : " + moduleId);
-        System.out.println("Fields for module: " + fields.size());
+        System.out.println("Available fields : " + allFields.size());
+        System.out.println("Fields/document  : " + effectiveFields);
+        System.out.println("Size/document    : " + (documentSizeBytes > 0 ? documentSizeBytes + " bytes" : "no padding"));
         System.out.println("Batch size       : " + MAX_BATCH_SIZE);
         long totalBatches = (totalDocuments + MAX_BATCH_SIZE - 1) / MAX_BATCH_SIZE;
         System.out.println("Total batches    : " + totalBatches);
         System.out.println("---------------------\n");
 
-        generator.generateAndSend(totalDocuments, moduleId);
+        generator.generateAndSend(totalDocuments, moduleId, fieldsPerDocument, documentSizeBytes);
     }
 
     /**
@@ -140,12 +152,26 @@ public class DataGenerator {
 
     /**
      * Generates all documents in batches and sends each batch to the server.
+     *
+     * @param totalDocuments   total number of documents to generate
+     * @param moduleId         module ID to select fields from XML
+     * @param fieldsPerDocument max fields per document (0 or negative = use all XML fields)
+     * @param documentSizeBytes target document size in bytes (0 or negative = no size padding)
      */
-    public void generateAndSend(long totalDocuments, String moduleId) throws Exception {
-        List<String> fields = getFieldsForModule(moduleId);
-        if (fields.isEmpty()) {
+    public void generateAndSend(long totalDocuments, String moduleId,
+                                int fieldsPerDocument, int documentSizeBytes) throws Exception {
+        List<String> allFields = getFieldsForModule(moduleId);
+        if (allFields.isEmpty()) {
             System.out.println("No fields found for MODULE_ID " + moduleId + ". Aborting.");
             return;
+        }
+
+        // Limit number of fields if requested
+        List<String> fields;
+        if (fieldsPerDocument > 0 && fieldsPerDocument < allFields.size()) {
+            fields = allFields.subList(0, fieldsPerDocument);
+        } else {
+            fields = allFields;
         }
 
         long entityIdCounter = 1;
@@ -158,7 +184,7 @@ public class DataGenerator {
             JSONArray bulkChgArr = new JSONArray();
 
             for (int i = 0; i < batchCount; i++) {
-                JSONObject document = createDocument(entityIdCounter, moduleId, fields);
+                JSONObject document = createDocument(entityIdCounter, moduleId, fields, documentSizeBytes);
                 bulkChgArr.put(document);
                 entityIdCounter++;
             }
@@ -183,9 +209,16 @@ public class DataGenerator {
     /**
      * Creates a single document JSONObject matching the bulkChgArr format.
      * The CHANGE_DATA keys come from the XML field definitions for the given module,
-     * and values are filled from the dictionary.
+     * and values are filled from the dictionary. When targetSizeBytes is positive,
+     * dictionary words are concatenated per field until the total document size
+     * approaches the target.
+     *
+     * @param entityId        incremental entity ID
+     * @param moduleId        module ID value
+     * @param fields          list of field names from XML
+     * @param targetSizeBytes target document size in bytes (0 or negative = single word per field)
      */
-    JSONObject createDocument(long entityId, String moduleId, List<String> fields) {
+    JSONObject createDocument(long entityId, String moduleId, List<String> fields, int targetSizeBytes) {
         JSONObject document = new JSONObject();
         document.put("CHANGE_TYPE", CHANGE_TYPE);
         document.put("ENTITY_ID", String.valueOf(entityId));
@@ -195,9 +228,29 @@ public class DataGenerator {
 
         JSONObject changeData = new JSONObject();
 
-        for (String fieldName : fields) {
-            String value = dictionary.get(random.nextInt(dictionary.size()));
-            changeData.put(fieldName, value);
+        if (targetSizeBytes <= 0 || fields.isEmpty()) {
+            // No size target: single dictionary word per field
+            for (String fieldName : fields) {
+                String value = dictionary.get(random.nextInt(dictionary.size()));
+                changeData.put(fieldName, value);
+            }
+        } else {
+            // Calculate envelope size (outer fixed keys) to know remaining budget for CHANGE_DATA
+            int envelopeSize = document.toString().getBytes(StandardCharsets.UTF_8).length;
+            int remainingBytes = Math.max(targetSizeBytes - envelopeSize, 0);
+            int perFieldBudget = remainingBytes / fields.size();
+
+            for (String fieldName : fields) {
+                StringBuilder valueBuilder = new StringBuilder();
+                while (valueBuilder.length() < perFieldBudget) {
+                    String word = dictionary.get(random.nextInt(dictionary.size()));
+                    if (valueBuilder.length() > 0) {
+                        valueBuilder.append(' ');
+                    }
+                    valueBuilder.append(word);
+                }
+                changeData.put(fieldName, valueBuilder.toString());
+            }
         }
 
         document.put("CHANGE_DATA", changeData);
