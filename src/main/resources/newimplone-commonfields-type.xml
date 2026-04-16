@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--$Id$-->
+
+<DefaultServiceEntry SERVICE_NAME="newimplone">
+    <MigrationFieldEntry ID="PII">
+
+        <MigrationFieldConf FIELD_NAME="PII_NAME" ANALYZER_TYPE="13"/>
+        <MigrationFieldConf FIELD_NAME="PII_PHONENO_STR" ANALYZER_TYPE="14"/>
+        <MigrationFieldConf FIELD_NAME="PII_PHONENO_LONG" ANALYZER_TYPE="13"/>
+        <MigrationFieldConf FIELD_NAME="PII_MAIL" ANALYZER_TYPE="13"/>
+        <MigrationFieldConf FIELD_NAME="PII_CITY" ANALYZER_TYPE="13"/>
+        <MigrationFieldConf FIELD_NAME="PII_ZIP" ANALYZER_TYPE="13"/>
+        <MigrationFieldConf FIELD_NAME="CONTACT_DATA" ANALYZER_TYPE="13"/>
+        <MigrationFieldConf FIELD_NAME="enc_all_fields" ANALYZER_TYPE="12"/>
+
+    </MigrationFieldEntry>
+    <DefaultFieldTypeEntry>
+
+        <DefaultFieldType FIELD_NAME="module_id" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false"  AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="SOLUTION_NOT2" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+        <DefaultFieldType FIELD_NAME="SOLUTION_NOT3" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+        <DefaultFieldType FIELD_NAME="SOLUTION_NOT4" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+        <DefaultFieldType FIELD_NAME="SOLUTION_NOT5" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+        <DefaultFieldType FIELD_NAME="bulk_update_criteria" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+        <DefaultFieldType FIELD_NAME="update_criteria" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+        <DefaultFieldType FIELD_NAME="delete_criteria" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+
+        <DefaultFieldType FIELD_NAME="BS_StrField" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+        <DefaultFieldType FIELD_NAME="BS_SOLUTION" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+        <DefaultFieldType FIELD_NAME="BS_NumericInt" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" />
+
+        <!-- multivalued and numeric operation fields -->
+        <DefaultFieldType FIELD_NAME="l4_long_num_opr" FIELD_TYPE="1" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" NUMERIC_OPR_FIELD="true" />
+        <DefaultFieldType FIELD_NAME="l4_int_num_opr" FIELD_TYPE="2" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" NUMERIC_OPR_FIELD="true" />
+        <DefaultFieldType FIELD_NAME="l4_float_num_opr" FIELD_TYPE="3" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" NUMERIC_OPR_FIELD="true" />
+        <DefaultFieldType FIELD_NAME="l4_double_num_opr" FIELD_TYPE="4" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" NUMERIC_OPR_FIELD="true" />
+        <DefaultFieldType FIELD_NAME="l4_string_multi" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" MULTI_VALUED="true" />
+
+        <DefaultFieldType FIELD_NAME="l9_long_num_opr" FIELD_TYPE="1" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" NUMERIC_OPR_FIELD="true" DOCVALUE="true" />
+        <DefaultFieldType FIELD_NAME="l9_int_num_opr" FIELD_TYPE="2" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" NUMERIC_OPR_FIELD="true" DOCVALUE="true" />
+        <DefaultFieldType FIELD_NAME="l9_float_num_opr" FIELD_TYPE="3" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" NUMERIC_OPR_FIELD="true" DOCVALUE="true" />
+        <DefaultFieldType FIELD_NAME="l9_double_num_opr" FIELD_TYPE="4" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" NUMERIC_OPR_FIELD="true" DOCVALUE="true" />
+        <DefaultFieldType FIELD_NAME="l9_string_multi" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" MULTI_VALUED="true" />
+
+
+        <!-- For copy fields (Some fields are configured in newimplone-field-type.xml) -->
+
+        <DefaultFieldType FIELD_NAME="SourceCopyFieldForUpdateCriteria" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+        <DefaultFieldType FIELD_NAME="SourceCopyFieldForDeleteCriteria" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+
+        <!-- Onefield to Manyfields behaviour-->
+        <DefaultFieldType FIELD_NAME="SourceCopyField1" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+            <CopyToField>CopyField1</CopyToField>
+            <CopyToField>CopyField2</CopyToField>
+            <CopyToField>CopyField3</CopyToField>
+        </DefaultFieldType>
+
+        <!-- ManyFields to oneField behaviour-->
+        <DefaultFieldType FIELD_NAME="SourceCopyField2" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+            <CopyToField>CopyField4</CopyToField>
+        </DefaultFieldType>
+        <DefaultFieldType FIELD_NAME="SourceCopyField3" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+            <CopyToField>CopyField4</CopyToField>
+        </DefaultFieldType>
+        <DefaultFieldType FIELD_NAME="SourceCopyField4" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+            <CopyToField>CopyField4</CopyToField>
+        </DefaultFieldType>
+
+        <!-- Numeric field -->
+        <DefaultFieldType FIELD_NAME="SourceCopyFieldNum1" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+            <CopyToField>CopyField7</CopyToField>
+            <CopyToField>CopyField8</CopyToField>
+        </DefaultFieldType>
+        <DefaultFieldType FIELD_NAME="SourceCopyFieldNum2" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+            <CopyToField>CopyField8</CopyToField>
+        </DefaultFieldType>
+
+
+        <!-- For time fields -->
+
+        <DefaultFieldType FIELD_NAME="CREATEDTIME" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" DOCVALUE="true" AGGREGATION="true"/>
+
+        <DefaultFieldType FIELD_NAME="MODIFIEDTIME" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" DOCVALUE="true" AGGREGATION="true">
+            <CopyToField>time</CopyToField>
+        </DefaultFieldType>
+
+        <DefaultFieldType FIELD_NAME="time" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" FACET="true" DOCVALUE="true" AGGREGATION="true"/>
+
+        <DefaultFieldType FIELD_NAME_PREFIX="NumericField" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true">
+            <FieldNameSuffix RANGE_START="2"  RANGE_END="120" />
+        </DefaultFieldType>
+
+        <DefaultFieldType FIELD_NAME="CONTENT_FILE_NAME" FIELD_TYPE="9" INDEX_PREFERENCE="0" STORED="false" ALL_FIELDS="false"  />
+
+        <!-- new radial fields -->
+
+        <DefaultFieldType FIELD_NAME="shipping_add" FIELD_TYPE="8" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+        <DefaultFieldType FIELD_NAME="billing_add" FIELD_TYPE="8" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" />
+        <DefaultFieldType FIELD_NAME="home_add" FIELD_TYPE="8" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" />
+
+        <!-- radial / geo fields -->
+
+        <!--    <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="latitude" FIELD_TYPE="8" INDEX_PREFERENCE="1"   STORED="true"/>-->
+        <!--    <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="longitude" FIELD_TYPE="8" INDEX_PREFERENCE="1"   STORED="true"/>-->
+
+
+        <!-- BEFORE REFRESH INDEX -->
+        <!--
+         String field Analyzed going to convert as Not Analyzed
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex1" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         String field NotAnalyzed going to convert as Analyzed
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex2" FIELD_TYPE="0" INDEX_PREFERENCE="2"   STORED="true"/>
+
+         String field Indexed type going to convert as Not Indexed type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex3" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         String field Not Indexed type going to convert as Indexed type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex4" FIELD_TYPE="0" INDEX_PREFERENCE="0"   STORED="true"/>
+         Numeric field Indexed type going to convert as Not Indexed type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex5" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field Not Indexed type going to convert as Indexed type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex6" FIELD_TYPE="1" INDEX_PREFERENCE="0"   STORED="true"/>
+         Float field Indexed type going to convert as Not Indexed type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex7" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+         Float field Not Indexed type going to convert as Indexed type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex8" FIELD_TYPE="3" INDEX_PREFERENCE="0"   STORED="true"/>
+         Double field Indexed type going to convert as Not Indexed type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex9" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+         Double field Not Indexed type going to convert as Indexed type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex10" FIELD_TYPE="4" INDEX_PREFERENCE="0"   STORED="true"/>
+
+         String field Stored type going to convert as Not Stored type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex11" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field Stored type going to convert as Not Stored type
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex12" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+
+
+         String field All Fields true going to convert as false
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex13" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         String field All Fields false going to convert as true
+        <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="RefreshIndex14" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field All Fields true going to convert as false
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex15" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field All Fields false going to convert as true
+        <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="RefreshIndex16" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+         Float field All Fields true going to convert as false
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex17" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+         Float field All Fields false going to convert as true
+        <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="RefreshIndex18" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+         Double field All Fields true going to convert as false
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex19" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+         Double field All Fields false going to convert as true
+        <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="RefreshIndex20" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+
+         String field going to convert as Numeric Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex21" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         String field going to convert as Float Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex22" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         String field going to convert as Double Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex23" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+
+         Numeric field going to convert as String Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex24" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field going to convert as Float Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex25" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field going to convert as Double Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex26" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+
+         Float field going to convert as String Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex27" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+         Float field going to convert as Double Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex28" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+
+         Double field going to convert as String Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex29" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+         Double field going to convert as Float Field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex30" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+
+         String field Facet field true going to convert as false
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex31" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true" FACET="true"/>
+         String field Facet field false going to convert as true
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex32" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field Facet field true going to convert as false
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex33" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true" FACET="true"/>
+         Numeric field Facet field false going to convert as true
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex34" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+         Float field Facet field true going to convert as false
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex35" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true" FACET="true"/>
+         Float field Facet field false going to convert as true
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex36" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+         Double field Facet field true going to convert as false
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex37" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true" FACET="true"/>
+         Double field Facet field false going to convert as true
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex38" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+
+         String field 1-1 copy field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex39" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         String field 1-2 copy field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex40" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field 1-1 copy field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex41" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+         Numeric field 1-2 copy field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex42" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+         Float field 1-1 copy field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex43" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+         Float field 1-2 copy field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex44" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+         Double field 1-1 copy field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex45" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+         Double field 1-2 copy field
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex46" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+        -->
+
+
+        <!--AFTER REFERSH INDEX -->
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex1" FIELD_TYPE="0" INDEX_PREFERENCE="2"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex2" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex3" FIELD_TYPE="0" INDEX_PREFERENCE="0"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex4" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex5" FIELD_TYPE="1" INDEX_PREFERENCE="0"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex6" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex7" FIELD_TYPE="3" INDEX_PREFERENCE="0"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex8" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex9" FIELD_TYPE="4" INDEX_PREFERENCE="0"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex10" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex11" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="false"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex12" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="false"/>
+
+        <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="RefreshIndex13" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex14" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="RefreshIndex15" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex16" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="RefreshIndex17" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex18" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="false" FIELD_NAME="RefreshIndex19" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex20" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex21" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex22" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex23" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex24" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex25" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex26" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex27" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex28" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex29" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex30" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex31" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex32" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true" FACET="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex33" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex34" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true" FACET="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex35" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex36" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true" FACET="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex37" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex38" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true" FACET="true"/>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex39" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true">
+            <CopyToField>RefreshIndexCopy1</CopyToField>
+        </DefaultFieldType>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex40" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true">
+            <CopyToField>RefreshIndexCopy2</CopyToField>
+            <CopyToField>RefreshIndexCopy3</CopyToField>
+        </DefaultFieldType>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex41" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true">
+            <CopyToField>RefreshIndexCopy4</CopyToField>
+        </DefaultFieldType>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex42" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true">
+            <CopyToField>RefreshIndexCopy5</CopyToField>
+            <CopyToField>RefreshIndexCopy6</CopyToField>
+        </DefaultFieldType>
+
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex43" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true">
+            <CopyToField>RefreshIndexCopy7</CopyToField>
+        </DefaultFieldType>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex44" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true">
+            <CopyToField>RefreshIndexCopy8</CopyToField>
+            <CopyToField>RefreshIndexCopy9</CopyToField>
+        </DefaultFieldType>
+
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex45" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true">
+            <CopyToField>RefreshIndexCopy10</CopyToField>
+        </DefaultFieldType>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndex46" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true">
+            <CopyToField>RefreshIndexCopy11</CopyToField>
+            <CopyToField>RefreshIndexCopy12</CopyToField>
+        </DefaultFieldType>
+
+        <!--Refresh Index Copy Fields Configuration-->
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy1" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy2" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy3" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy4" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy5" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy6" FIELD_TYPE="1" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy7" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy8" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy9" FIELD_TYPE="3" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy10" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy11" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="RefreshIndexCopy12" FIELD_TYPE="4" INDEX_PREFERENCE="1"   STORED="true"/>
+        <DefaultFieldType FIELD_NAME="StringField" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+        <DefaultFieldType FIELD_NAME="StringField22" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+        <DefaultFieldType FIELD_NAME="StringField23" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+        <DefaultFieldType FIELD_NAME="StringField75" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+
+        <!-- Edgegram fields -->
+        <DefaultFieldType FIELD_NAME="EDGE1" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" ANALYZER_TYPE="9"/>
+        <DefaultFieldType FIELD_NAME="EDGE2" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" ANALYZER_TYPE="9"/>
+        <DefaultFieldType FIELD_NAME="EDGE4" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" ANALYZER_TYPE="9"/>
+
+        <!-- Aggregation fields -->
+        <DefaultFieldType FIELD_NAME="IntegerFld" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="FloatFld" FIELD_TYPE="3" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"  FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="LongFld" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="DoubleFld" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+
+        <DefaultFieldType FIELD_NAME="statusFld" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="departmentFld" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="itemCodeFld" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="categoryFld" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="subcategoryFld" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="regionFld" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+        <DefaultFieldType FIELD_NAME="tag" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" FACET="true" AGGREGATION="true"/>
+
+
+        <FieldGroup ID="1">
+            <DefaultFieldType FIELD_NAME="NumericInt" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericFloat" FIELD_TYPE="3" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericLong" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericDouble" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+        </FieldGroup>
+
+    </DefaultFieldTypeEntry>
+</DefaultServiceEntry>

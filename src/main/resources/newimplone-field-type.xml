@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--$Id$-->
+<DefaultServiceEntry SERVICE_NAME="newimplone">
+
+    <DefaultModuleEntry>
+        <ModuleGroup>
+            <ModuleRange RANGE_START="1" RANGE_END="3"/>
+            <ModuleRange RANGE_START="4" RANGE_END="5">
+                <FieldGroup ID="1"/>
+            </ModuleRange>
+        </ModuleGroup>
+    </DefaultModuleEntry>
+
+    <DefaultFieldTypeEntry>
+
+        <Module ID="1">
+
+            <DefaultFieldType FIELD_NAME="ZSOID" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="ENTITY_ID" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="GROUPID" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="DEP_ID" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="SMCREATORID" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="SMOWNERID" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="PRODUCTID" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="MODIFIEDBY" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="TOPIC_ID" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="SOLUTIONNUMBER" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="PRESENCE" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="IMPORT_ID" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="ACCOUNTID" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="WHOID" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="ISSPAM" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false"  />
+            <DefaultFieldType FIELD_NAME="CASE_DESCRIPTION" FIELD_TYPE="5" INDEX_PREFERENCE="1" STORED="false" ALL_FIELDS="false" DEFAULT_FILE_FIELD="true" />
+            <DefaultFieldType FIELD_NAME="StringFieldNotStored" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="false" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT1" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+            <!--            <DefaultFieldType FIELD_NAME="CUSTOM_ANALYZER" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" ANALYZER_TYPE="100" CUSTOM_ANALYZER_ID="search1" />-->
+
+            <DefaultFieldType FIELD_NAME="NumericInt" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+            <DefaultFieldType FIELD_NAME="NumericFloat" FIELD_TYPE="3" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+            <DefaultFieldType FIELD_NAME="NumericLong" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+            <DefaultFieldType FIELD_NAME="NumericDouble" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+            <DefaultFieldType FIELD_NAME="StrField" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="SOLUTION" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT_LOWERCASED" FIELD_TYPE="0" INDEX_PREFERENCE="5" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericInt_Doc_Value_False" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="false" />
+            <DefaultFieldType FIELD_NAME="NumericFloat_Doc_Value_False" FIELD_TYPE="3" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="false" />
+            <DefaultFieldType FIELD_NAME="NumericLong_Doc_Value_False" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="false" />
+            <DefaultFieldType FIELD_NAME="NumericDouble_Doc_Value_False" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="false" />
+            <DefaultFieldType FIELD_NAME="StrField_Doc_Value_False" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="false" />
+
+            <DefaultFieldType FIELD_NAME="PII_NAME"             FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="PII_PHONENO_STR"      FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+                <CopyToField>CONTACT_DATA</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="PII_PHONENO_LONG"     FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true">
+                <CopyToField>CONTACT_DATA</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="PII_MAIL"             FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+                <CopyToField>CONTACT_DATA</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="PII_CITY"             FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" />
+            <DefaultFieldType FIELD_NAME="PII_ZIP"              FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+
+            <DefaultFieldType FIELD_NAME="CONTACT_DATA"         FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" />
+
+            <DefaultFieldType FIELD_NAME_PREFIX="performance_ear_field_" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" ANALYZER_TYPE="3">
+                <FieldNameSuffix RANGE_START="1"  RANGE_END="200"/>
+            </DefaultFieldType>
+
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="NumericField1" FIELD_TYPE="2" INDEX_PREFERENCE="1"   STORED="true" DOCVALUE="true"  />
+
+            <DefaultFieldType FIELD_NAME_PREFIX="PRIVATE_COMMENT_" FIELD_TYPE="5" INDEX_PREFERENCE="1" STORED="false" ALL_FIELDS="false" >
+                <FieldNameSuffix RANGE_START="1"  RANGE_END="5" />
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME_PREFIX="PRIVATE_COMMENT_" FIELD_TYPE="5" INDEX_PREFERENCE="1" STORED="false" ALL_FIELDS="false" >
+                <FieldNameSuffix RANGE_START="7"  RANGE_END="9" />
+            </DefaultFieldType>
+            <!-- For copy fields (Some fields are configured in newimplone-commonfields-type.xml) -->
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="Refresh1" FIELD_TYPE="0" INDEX_PREFERENCE="1"   STORED="true"/>
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="Refresh2" FIELD_TYPE="1" INDEX_PREFERENCE="2"   STORED="true"/>
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="Refresh3" FIELD_TYPE="2" INDEX_PREFERENCE="2"   STORED="true"/>
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="Refresh4" FIELD_TYPE="3" INDEX_PREFERENCE="2"   STORED="true"/>
+            <DefaultFieldType FIELD_NAME_PREFIX="Refresh" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" >
+                <FieldNameSuffix RANGE_START="5"  RANGE_END="6" />
+            </DefaultFieldType>
+
+            <!-- For Edge gram fields -->
+
+            <DefaultFieldType FIELD_NAME="Edge_String_Analysed" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" >
+                <CopyToField>EDGE1</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="Edge_String_Not_Analysed" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="Edge_String_Analysed_Nonorms" FIELD_TYPE="0" INDEX_PREFERENCE="3" STORED="true" ALL_FIELDS="true" >
+                <CopyToField>EDGE1</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="Edge_String_Not_Analysed_Nonorms" FIELD_TYPE="0" INDEX_PREFERENCE="4" STORED="true" ALL_FIELDS="true"  />
+            <DefaultFieldType FIELD_NAME="Edge_String_Not_Analysed_LowerCased" FIELD_TYPE="0" INDEX_PREFERENCE="5" STORED="true" ALL_FIELDS="true" />
+
+            <DefaultFieldType FIELD_NAME="Edge_Int_Analysed" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true"/>
+            <DefaultFieldType FIELD_NAME="Edge_Long_Analysed" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="Edge_Float_Analysed" FIELD_TYPE="3" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="Edge_Double_Analysed" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="false" />
+
+            <!-- Aggregation -->
+
+            <DefaultFieldType FIELD_NAME="revenue" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="district" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="state" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="population" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="price" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="priceDecimal" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="growth" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="quantity" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="sales" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="profit" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="mark" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="studyhours" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="employee" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="tag" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="zone" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="createdTime" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true" AGGREGATION="true"/>
+
+
+            <!-- For faceting fields -->
+
+            <DefaultFieldType FIELD_NAME="type" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="gifts_for" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="age" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="gift_type" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="game_type" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="game_name" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="price" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="warranty" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="brand" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="brandcateg1" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="expire_in_months" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="genre" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" MULTI_VALUED="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="language" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" MULTI_VALUED="true" AGGREGATION="true"/>
+            <DefaultFieldType FIELD_NAME="discount" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" FACET="true" AGGREGATION="true"/>
+
+            <!-- For EAR Analyzer fields -->
+
+            <DefaultFieldType FIELD_NAME="ear_field_a_3" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" ANALYZER_TYPE="3" />
+            <DefaultFieldType FIELD_NAME="ear_field_na_3" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="false" ANALYZER_TYPE="4" />
+            <DefaultFieldType FIELD_NAME="ear_field_na_4" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" ANALYZER_TYPE="4" />
+            <DefaultFieldType FIELD_NAME="ear_field_na_5" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" ANALYZER_TYPE="5" />
+
+            <!-- oneField to oneField behaviour-->
+            <DefaultFieldType FIELD_NAME="SourceCopyField5" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+                <CopyToField>CopyField5</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="SourceCopyField6" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+                <CopyToField>CopyField6</CopyToField>
+            </DefaultFieldType>
+
+            <!-- ManyField to ManyField shuffled behaviour-->
+            <DefaultFieldType FIELD_NAME="SourceCopyField7" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+                <CopyToField>CopyField7</CopyToField>
+                <CopyToField>CopyField8</CopyToField>
+                <CopyToField>CopyField9</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="SourceCopyField8" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+                <CopyToField>CopyField8</CopyToField>
+                <CopyToField>CopyField9</CopyToField>
+                <CopyToField>CopyField10</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="SourceCopyField9" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true">
+                <CopyToField>CopyField8</CopyToField>
+                <CopyToField>CopyField10</CopyToField>
+            </DefaultFieldType>
+
+            <DefaultFieldType FIELD_NAME="appendfield1" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" MULTI_VALUED="true"/>
+            <DefaultFieldType FIELD_NAME="appendfield2" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" MULTI_VALUED="true"/>
+            <DefaultFieldType FIELD_NAME="appendfield3" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" MULTI_VALUED="true"/>
+            <DefaultFieldType FIELD_NAME="appendfield4" FIELD_TYPE="1" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" NUMERIC_OPR_FIELD="true"/>
+            <DefaultFieldType FIELD_NAME="appendfield5" FIELD_TYPE="2" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" NUMERIC_OPR_FIELD="true"/>
+            <DefaultFieldType FIELD_NAME="appendfield6" FIELD_TYPE="1" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" NUMERIC_OPR_FIELD="true"/>
+            <DefaultFieldType FIELD_NAME="appendfield7" FIELD_TYPE="2" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" NUMERIC_OPR_FIELD="true"/>
+
+        </Module>
+
+        <Module ID="2">
+
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT1" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" ADD_TO_NONEMPTY_FIELD="false"/>
+            <DefaultFieldType FIELD_NAME="NumericInt" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true"  ADD_TO_NONEMPTY_FIELD="false" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericFloat" FIELD_TYPE="3" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true"  ADD_TO_NONEMPTY_FIELD="false" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericLong" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true"  ADD_TO_NONEMPTY_FIELD="false" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericDouble" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true"  ADD_TO_NONEMPTY_FIELD="false" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="StrField" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true"  ADD_TO_NONEMPTY_FIELD="false" DOCVALUE="true">
+                <CopyToField>EDGE4</CopyToField>
+            </DefaultFieldType>
+            <DefaultFieldType FIELD_NAME="SOLUTION" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true"  ADD_TO_NONEMPTY_FIELD="false"/>
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true"  ADD_TO_NONEMPTY_FIELD="false"/>
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT_LOWERCASED" FIELD_TYPE="0" INDEX_PREFERENCE="5" STORED="true" ALL_FIELDS="true" DOCVALUE="true" ADD_TO_NONEMPTY_FIELD="false"/>
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="NumericField1" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true"/>
+            <DefaultFieldType FIELD_NAME="CASE_DESCRIPTION" FIELD_TYPE="5" INDEX_PREFERENCE="1" STORED="false" ALL_FIELDS="false" DEFAULT_FILE_FIELD="true" />
+
+        </Module>
+
+        <Module ID="3">
+
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT1" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="NumericField1" FIELD_TYPE="2" INDEX_PREFERENCE="1"   STORED="true"/>
+            <DefaultFieldType FIELD_NAME="NumericInt" FIELD_TYPE="2" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericFloat" FIELD_TYPE="3" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericLong" FIELD_TYPE="1" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="NumericDouble" FIELD_TYPE="4" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="StrField" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="SOLUTION" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT_LOWERCASED" FIELD_TYPE="0" INDEX_PREFERENCE="5" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+            <DefaultFieldType FIELD_NAME="CASE_DESCRIPTION" FIELD_TYPE="5" INDEX_PREFERENCE="1" STORED="false" ALL_FIELDS="false" DEFAULT_FILE_FIELD="true" />
+
+        </Module>
+
+        <Module ID="4">
+
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT1" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="StrField" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="SOLUTION" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT_LOWERCASED" FIELD_TYPE="0" INDEX_PREFERENCE="5" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="NumericField1" FIELD_TYPE="2" INDEX_PREFERENCE="1"   STORED="true"/>
+            <DefaultFieldType FIELD_NAME="CASE_DESCRIPTION" FIELD_TYPE="5" INDEX_PREFERENCE="1" STORED="false" ALL_FIELDS="false" DEFAULT_FILE_FIELD="true" />
+
+        </Module>
+
+        <Module ID="5">
+
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT1" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="StrField" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" DOCVALUE="true"/>
+            <DefaultFieldType FIELD_NAME="SOLUTION" FIELD_TYPE="0" INDEX_PREFERENCE="1" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT" FIELD_TYPE="0" INDEX_PREFERENCE="2" STORED="true" ALL_FIELDS="true" />
+            <DefaultFieldType FIELD_NAME="SOLUTION_NOT_LOWERCASED" FIELD_TYPE="0" INDEX_PREFERENCE="5" STORED="true" ALL_FIELDS="true" DOCVALUE="true" />
+            <DefaultFieldType ALL_FIELDS="true" FIELD_NAME="NumericField1" FIELD_TYPE="2" INDEX_PREFERENCE="1"   STORED="true"/>
+            <DefaultFieldType FIELD_NAME="CASE_DESCRIPTION" FIELD_TYPE="5" INDEX_PREFERENCE="1" STORED="false" ALL_FIELDS="false" DEFAULT_FILE_FIELD="true" />
+
+        </Module>
+
+    </DefaultFieldTypeEntry>
+</DefaultServiceEntry>
