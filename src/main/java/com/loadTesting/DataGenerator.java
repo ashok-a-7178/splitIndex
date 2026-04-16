@@ -35,14 +35,16 @@ public class DataGenerator {
     private static final String ZSOID = "83848386";
     private static final String MODULE_ID = "1";
     private static final String CHANGE_TYPE = "1";
-    private static final String SIGNATURE = "ZohoSearch-1776348447204-12c6e970b2d28946a3db14e52b19908b476b15a34ad3c3584b50e8f1bde602843235ae7aa205a74461d8df793c8901a49f5c4370c8f091f1c17e52effd4fac48";
+    private static final String DEFAULT_SIGNATURE = "ZohoSearch-1776348447204-12c6e970b2d28946a3db14e52b19908b476b15a34ad3c3584b50e8f1bde602843235ae7aa205a74461d8df793c8901a49f5c4370c8f091f1c17e52effd4fac48";
 
     private final List<String> dictionary;
     private final Random random;
+    private final String signature;
 
     public DataGenerator() {
         this.dictionary = loadDictionary();
         this.random = new Random();
+        this.signature = System.getProperty("iscsignature", DEFAULT_SIGNATURE);
     }
 
     public static void main(String[] args) throws Exception {
@@ -57,7 +59,7 @@ public class DataGenerator {
 
         System.out.print("Enter target data size per document in bytes (e.g., 3072 for 3KB): ");
         int documentSizeBytes = scanner.nextInt();
-        scanner.close();
+        // Not closing scanner to avoid closing System.in
 
         System.out.println("\n--- Configuration ---");
         System.out.println("Total documents  : " + totalDocuments);
@@ -129,6 +131,11 @@ public class DataGenerator {
         int currentSize = 0;
         int fieldIndex = 0;
 
+        if (maxFields <= 0) {
+            document.put("CHANGE_DATA", changeData);
+            return document;
+        }
+
         while (fieldIndex < maxFields && currentSize < remainingBytes) {
             String fieldName = "FIELD_" + (fieldIndex + 1);
             StringBuilder valueBuilder = new StringBuilder();
@@ -166,7 +173,7 @@ public class DataGenerator {
             String parameterString = "service=" + SERVICE
                     + "&version=" + VERSION
                     + "&bulkChgArr=" + encodedBulkChgArr
-                    + "&iscsignature=" + SIGNATURE;
+                    + "&iscsignature=" + signature;
 
             URL url = new URL(DEFAULT_URL);
             httpConnection = (HttpURLConnection) url.openConnection();
@@ -213,8 +220,11 @@ public class DataGenerator {
      */
     private List<String> loadDictionary() {
         List<String> words = new ArrayList<>();
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream("dictionary.txt");
-             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+        InputStream is = getClass().getClassLoader().getResourceAsStream("dictionary.txt");
+        if (is == null) {
+            throw new RuntimeException("dictionary.txt not found in classpath resources");
+        }
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
