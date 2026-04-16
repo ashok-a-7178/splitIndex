@@ -283,13 +283,10 @@ public class DataGenerator {
 
             Element fieldTypeEntry = (Element) fieldTypeEntries.item(0);
 
-            // Collect FieldGroup IDs to exclude their children from common fields
+            // Parse FieldGroup sections and extract their fields
             NodeList fieldGroups = fieldTypeEntry.getElementsByTagName("FieldGroup");
-            Set<Element> fieldGroupElements = new LinkedHashSet<>();
             for (int i = 0; i < fieldGroups.getLength(); i++) {
                 Element fgElem = (Element) fieldGroups.item(i);
-                fieldGroupElements.add(fgElem);
-
                 String groupId = fgElem.getAttribute("ID");
                 List<String> groupFields = extractFieldNames(fgElem);
                 fieldGroupFieldsMap.put(groupId, groupFields);
@@ -328,7 +325,7 @@ public class DataGenerator {
         for (int i = 0; i < fieldTypes.getLength(); i++) {
             Element fieldElem = (Element) fieldTypes.item(i);
             // Only process direct children of the parent
-            if (fieldElem.getParentNode() != parent) {
+            if (!fieldElem.getParentNode().isSameNode(parent)) {
                 continue;
             }
             fieldNames.addAll(resolveFieldNames(fieldElem));
