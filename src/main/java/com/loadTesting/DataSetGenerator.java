@@ -50,6 +50,9 @@ public class DataSetGenerator {
     /** Module-to-FieldGroup associations: moduleId → set of group IDs. */
     private final Map<String, Set<String>> moduleFieldGroupMap;
 
+    /** Field names that are string (FIELD_TYPE="0") and not-analyzed (INDEX_PREFERENCE="2"). */
+    private final Set<String> stringNotAnalyzedFields;
+
     public DataSetGenerator() {
         this.dictionary = loadDictionary();
         this.random = new Random();
@@ -57,6 +60,7 @@ public class DataSetGenerator {
         this.commonFields = new ArrayList<>();
         this.fieldGroupFieldsMap = new LinkedHashMap<>();
         this.moduleFieldGroupMap = new HashMap<>();
+        this.stringNotAnalyzedFields = new LinkedHashSet<>();
         parseFieldTypeXml();
         parseCommonFieldsXml();
     }
@@ -64,6 +68,22 @@ public class DataSetGenerator {
     // ----------------------------------------------------------------
     //  Public API
     // ----------------------------------------------------------------
+
+    /**
+     * Returns the string not-analyzed field names (FIELD_TYPE="0",
+     * INDEX_PREFERENCE="2") that are applicable to the given module.
+     * These are the only fields eligible for cardinality control.
+     */
+    public List<String> getStringNotAnalyzedFieldsForModule(String moduleId) {
+        List<String> allFields = getFieldsForModule(moduleId);
+        List<String> result = new ArrayList<>();
+        for (String f : allFields) {
+            if (stringNotAnalyzedFields.contains(f)) {
+                result.add(f);
+            }
+        }
+        return result;
+    }
 
     /**
      * Returns the combined list of field names applicable to a module:
@@ -102,6 +122,27 @@ public class DataSetGenerator {
      */
     public JSONObject createDocument(long entityId, String moduleId,
                                      List<String> fields, int targetSizeBytes) {
+        return createDocument(entityId, moduleId, fields, targetSizeBytes,
+                java.util.Collections.<String, Integer>emptyMap());
+    }
+
+    /**
+     * Creates a single document with cardinality control.
+     *
+     * <p>Fields present in {@code cardinalityMap} receive values drawn from
+     * a fixed pool of exactly {@code cardinality} unique values
+     * (e.g.&nbsp;{@code "FIELD_val_0"} … {@code "FIELD_val_N-1"}), producing
+     * the desired number of distinct terms in the index.</p>
+     *
+     * @param entityId        incremental entity ID
+     * @param moduleId        module ID value
+     * @param fields          list of field names
+     * @param targetSizeBytes target document size (≤ 0 = no padding)
+     * @param cardinalityMap  fieldName → number of unique values (empty = no cardinality control)
+     */
+    public JSONObject createDocument(long entityId, String moduleId,
+                                     List<String> fields, int targetSizeBytes,
+                                     Map<String, Integer> cardinalityMap) {
         JSONObject document = new JSONObject();
         document.put("CHANGE_TYPE", LoadTestConfig.CHANGE_TYPE);
         document.put("ENTITY_ID", String.valueOf(entityId));
@@ -113,7 +154,13 @@ public class DataSetGenerator {
 
         if (targetSizeBytes <= 0 || fields.isEmpty()) {
             for (String fieldName : fields) {
-                changeData.put(fieldName, randomWord());
+                Integer cardinality = cardinalityMap.get(fieldName);
+                if (cardinality != null && cardinality > 0) {
+                    changeData.put(fieldName,
+                            fieldName + "_val_" + (entityId % cardinality));
+                } else {
+                    changeData.put(fieldName, randomWord());
+                }
             }
         } else {
             int envelopeSize = document.toString().getBytes(StandardCharsets.UTF_8).length;
@@ -121,14 +168,20 @@ public class DataSetGenerator {
             int perFieldBudget = remainingBytes / fields.size();
 
             for (String fieldName : fields) {
-                StringBuilder valueBuilder = new StringBuilder();
-                while (valueBuilder.length() < perFieldBudget) {
-                    if (valueBuilder.length() > 0) {
-                        valueBuilder.append(' ');
+                Integer cardinality = cardinalityMap.get(fieldName);
+                if (cardinality != null && cardinality > 0) {
+                    changeData.put(fieldName,
+                            fieldName + "_val_" + (entityId % cardinality));
+                } else {
+                    StringBuilder valueBuilder = new StringBuilder();
+                    while (valueBuilder.length() < perFieldBudget) {
+                        if (valueBuilder.length() > 0) {
+                            valueBuilder.append(' ');
+                        }
+                        valueBuilder.append(randomWord());
                     }
-                    valueBuilder.append(randomWord());
+                    changeData.put(fieldName, valueBuilder.toString());
                 }
-                changeData.put(fieldName, valueBuilder.toString());
             }
         }
 
@@ -149,9 +202,29 @@ public class DataSetGenerator {
     public JSONArray generateBatch(long startEntityId, int batchSize,
                                    String moduleId, List<String> fields,
                                    int targetSizeBytes) {
+        return generateBatch(startEntityId, batchSize, moduleId, fields,
+                targetSizeBytes, java.util.Collections.<String, Integer>emptyMap());
+    }
+
+    /**
+     * Generates a batch of documents with cardinality control.
+     *
+     * @param startEntityId   first entity ID in this batch
+     * @param batchSize       number of documents to generate
+     * @param moduleId        module ID for field selection
+     * @param fields          pre-resolved field list
+     * @param targetSizeBytes target document size (≤ 0 = no padding)
+     * @param cardinalityMap  fieldName → number of unique values
+     * @return the batch as a JSONArray
+     */
+    public JSONArray generateBatch(long startEntityId, int batchSize,
+                                   String moduleId, List<String> fields,
+                                   int targetSizeBytes,
+                                   Map<String, Integer> cardinalityMap) {
         JSONArray batch = new JSONArray();
         for (int i = 0; i < batchSize; i++) {
-            batch.put(createDocument(startEntityId + i, moduleId, fields, targetSizeBytes));
+            batch.put(createDocument(startEntityId + i, moduleId, fields,
+                    targetSizeBytes, cardinalityMap));
         }
         return batch;
     }
@@ -290,6 +363,13 @@ public class DataSetGenerator {
                     names.add(fieldNamePrefix + k);
                 }
             }
+        }
+
+        // Track string not-analyzed fields (FIELD_TYPE="0" + INDEX_PREFERENCE="2")
+        String fieldType = fieldElem.getAttribute("FIELD_TYPE");
+        String indexPref = fieldElem.getAttribute("INDEX_PREFERENCE");
+        if ("0".equals(fieldType) && "2".equals(indexPref)) {
+            stringNotAnalyzedFields.addAll(names);
         }
 
         return names;
